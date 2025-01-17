@@ -14,35 +14,49 @@ try {
     // 初始化日志系统
     $logDir = $config->get('LOG_DIR');
     $logger = Logger::getInstance('app', $logDir);
-    
-    // Initialize log rotation service
+    $config->setLogger($logger);
+
+    // 记录启动信息
+    $logger->info('Initializing application...', [
+        'environment' => $config->get('APP_ENV'),
+        'log_dir' => $logDir
+    ]);
+
+    // 初始化日志轮转服务
     $logRotateService = new LogRotateService(
         $logDir,
         $config->get('LOG_ROTATE_FILE'),
-        $config->get('LOG_MAX_SIZE'),
-        $config->get('LOG_MAX_FILES'),
-        $config->get('LOG_RETENTION_DAYS'),
+        (int)$config->get('LOG_MAX_SIZE'),
+        (int)$config->get('LOG_MAX_FILES'),
+        (int)$config->get('LOG_RETENTION_DAYS')
     );
 
-    // Log application start
+    // 执行日志轮转
+    $logRotateService->rotate();
+    $logger->info('Log rotation completed');
+
+    // 主应用循环
     $logger->info('Application started', [
         'environment' => $config->get('APP_ENV', 'production')
     ]);
 
-    // Perform log rotation
-    $logRotateService->rotate();
-    $logger->info('Log rotation completed');
-
+    pcntl_async_signals(true);
+    pcntl_signal(SIGINT, function() use ($logger) {
+        $logger->info("\n🛑 Received shutdown signal");
+        $logger->info('✅ Application stopped gracefully');
+        exit(0);
+    });
 } catch (\Throwable $e) {
-    // Log error
+    // 初始化失败处理
     if (isset($logger)) {
-        $logger->error($e->getMessage(), [
+        $logger->emergency('Application failed to start', [
+            'message' => $e->getMessage(),
             'file' => $e->getFile(),
             'line' => $e->getLine(),
             'trace' => $e->getTraceAsString()
         ]);
     } else {
-        error_log($e->getMessage());
+        error_log('CRITICAL: ' . $e->getMessage());
     }
     
     exit(1);
