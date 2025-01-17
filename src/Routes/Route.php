@@ -10,10 +10,10 @@ class Route
 {
     private string $method;
     private string $path;
-    private $handler;
+    private array $handler;
     private MiddlewareStack $middlewareStack;
 
-    public function __construct(string $method, string $path, callable $handler, array $middleware = [])
+    public function __construct(string $method, string $path, array $handler, array $middleware = [])
     {
         $this->method = $method;
         $this->path = $path;
@@ -24,16 +24,19 @@ class Route
     public function matches(Request $request): bool
     {
         return $this->method === $request->getMethod() &&
-               $this->path === $request->getPath();
+            $this->path === $request->getPath();
     }
 
-    public function execute(Request $request): Response
+    public function handle(Request $request): Response
     {
-        return call_user_func($this->handler, $request);
-    }
+        $response = $this->middlewareStack->handle($request);
 
-    public function getMiddlewareStack(): MiddlewareStack
-    {
-        return $this->middlewareStack;
+        if ($response) {
+            return $response;
+        }
+
+        [$controllerClass, $methodName] = $this->handler;
+        $controller = new $controllerClass();
+        return $controller->$methodName($request);
     }
 }

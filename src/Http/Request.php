@@ -9,19 +9,49 @@ class Request
     private array $queryParams;
     private array $bodyParams;
     private array $headers;
+    private array $cookies;
+    private array $files;
 
     public function __construct(
         string $method,
         string $path,
+        array $server = [],
         array $queryParams = [],
         array $bodyParams = [],
-        array $headers = []
+        array $cookies = [],
+        array $files = []
     ) {
-        $this->method = $method;
+        $this->method = strtoupper($method);
         $this->path = $path;
         $this->queryParams = $queryParams;
         $this->bodyParams = $bodyParams;
-        $this->headers = $headers;
+        $this->headers = $this->extractHeaders($server);
+        $this->cookies = $cookies;
+        $this->files = $files;
+    }
+
+    public static function createFromGlobals(): self
+    {
+        return new self(
+            $_SERVER['REQUEST_METHOD'] ?? 'GET',
+            $_SERVER['REQUEST_URI'] ?? '/',
+            $_SERVER,
+            $_GET,
+            $_POST,
+            $_COOKIE,
+            $_FILES
+        );
+    }
+
+    private function extractHeaders(array $server): array
+    {
+        $headers = [];
+        foreach ($server as $key => $value) {
+            if (str_starts_with($key, 'HTTP_')) {
+                $headers[str_replace('_', '-', substr($key, 5))] = $value;
+            }
+        }
+        return $headers;
     }
 
     public function getMethod(): string
@@ -52,5 +82,15 @@ class Request
     public function getHeader(string $name): ?string
     {
         return $this->headers[$name] ?? null;
+    }
+
+    public function getCookies(): array
+    {
+        return $this->cookies;
+    }
+
+    public function getFiles(): array
+    {
+        return $this->files;
     }
 }
