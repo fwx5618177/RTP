@@ -15,6 +15,7 @@ class LogRotateService
     private int $maxSize;
     private int $retentionDays;
     private array $mailConfig;
+    private Logger $logger;
 
     public function __construct(
         string $logDir,
@@ -29,14 +30,13 @@ class LogRotateService
         $this->logFile = $logFile;
         $this->maxSize = $maxSize;
         $this->maxFiles = $maxFiles;
+        $this->logger = Logger::getInstance('logrotate');
 
         if (!is_dir($this->logDir)) {
             if (mkdir($this->logDir, 0755, true)) {
-                $logger = Logger::getInstance('logrotate');
-                $logger->info("Created log directory: {$this->logDir}");
+                $this->logger->info("Created log directory: {$this->logDir}");
             } else {
-                $logger = Logger::getInstance('logrotate');
-                $logger->error("Failed to create log directory: {$this->logDir}");
+                $this->logger->error("Failed to create log directory: {$this->logDir}");
                 throw new LogRotateException("Failed to create log directory: {$this->logDir}");
             }
         }
@@ -47,8 +47,11 @@ class LogRotateService
         $logPath = "{$this->logDir}/{$this->logFile}";
 
         if (!file_exists($logPath) || filesize($logPath) < $this->maxSize) {
+            $this->logger->info("No rotation needed for log file: {$logPath}");
             return;
         }
+
+        $this->logger->info("Starting log rotation for: {$logPath}");
 
         $this->archiveCurrentLog($logPath);
         $this->cleanupOldArchives();
@@ -60,8 +63,7 @@ class LogRotateService
         $archivePath = "{$this->logDir}/{$this->logFile}.{$timestamp}.log";
 
         if (!rename($logPath, $archivePath)) {
-            $logger = Logger::getInstance('logrotate');
-            $logger->error("Failed to rotate log file: {$logPath}");
+            $this->logger->error("Failed to rotate log file: {$logPath}");
             throw new LogRotateException("Failed to rotate log file: {$logPath}");
         }
 
@@ -75,6 +77,7 @@ class LogRotateService
     private function compressLogFile(string $filePath): void
     {
         if (!extension_loaded('zlib')) {
+            $this->logger->warning("Zlib extension not loaded, skipping compression");
             return;
         }
 
@@ -83,12 +86,10 @@ class LogRotateService
         $compressed = gzencode($data, 9);
 
         if (file_put_contents($compressedPath, $compressed)) {
-            $logger = Logger::getInstance('logrotate');
-            $logger->info("Successfully compressed log file: {$filePath}");
+            $this->logger->info("Successfully compressed log file: {$filePath}");
             unlink($filePath);
         } else {
-            $logger = Logger::getInstance('logrotate');
-            $logger->error("Failed to compress log file: {$filePath}");
+            $this->logger->error("Failed to compress log file: {$filePath}");
             throw new LogRotateException("Failed to compress log file: {$filePath}");
         }
     }
@@ -113,11 +114,9 @@ class LogRotateService
             $filesToDelete = array_slice($files, 0, count($files) - $this->maxFiles);
             foreach ($filesToDelete as $file) {
                 if (unlink($file)) {
-                    $logger = Logger::getInstance('logrotate');
-                    $logger->info("Deleted old log file: {$file}");
+                    $this->logger->info("Deleted old log file: {$file}");
                 } else {
-                    $logger = Logger::getInstance('logrotate');
-                    $logger->error("Failed to delete old log file: {$file}");
+                    $this->logger->error("Failed to delete old log file: {$file}");
                 }
             }
         }
@@ -151,18 +150,15 @@ EOL;
         if (file_put_contents($configPath, $config)) {
             chmod($configPath, 0644);
         } else {
-            $logger = Logger::getInstance('logrotate');
-            $logger->error("Failed to write logrotate config");
+            $this->logger->error("Failed to write logrotate config");
             throw new LogRotateException("Failed to write logrotate config");
         }
     }
 
     public function notify(string $message): void
     {
-        $logger = Logger::getInstance('logrotate');
-        
-        // 记录日志
-        $logger->logWithColor('info', $message);
+        // 根据级别记录日志
+        $this->logger->log($level, $message);
         
         // 发送系统通知
         if (function_exists('syslog')) {
@@ -171,7 +167,11 @@ EOL;
 
         // 发送邮件通知
         if (!empty($this->mailConfig)) {
-            $this->sendMailNotification($message);
+            try {
+                $this->sendMailNotification($message);
+            } catch (\Exception $e) {
+                $this->logger->error('邮件发送失败: ' . $e->getMessage());
+            }
         }
     }
 
@@ -187,12 +187,10 @@ EOL;
                 $message,
                 $this->buildMailHeaders()
             )) {
-                $logger = Logger::getInstance('logrotate');
-                $logger->error("Failed to send mail notification");
+                $this->logger->error("Failed to send mail notification");
                 throw new MailNotificationException("Failed to send mail notification");
             }
-            $logger = Logger::getInstance('logrotate');
-            $logger->info("Mail notification sent successfully");
+            $this->logger->info("Mail notification sent successfully");
             return;
         }
 
@@ -213,12 +211,10 @@ EOL;
 
             try {
                 $mailer->send($swiftMessage);
-                $logger = Logger::getInstance('logrotate');
-                $logger->info("Mail notification sent successfully via SMTP");
+                $this->logger->info("Mail notification sent successfully via SMTP");
                 return;
             } catch (\Exception $e) {
-                $logger = Logger::getInstance('logrotate');
-                $logger->error("Failed to send mail notification via SMTP: " . $e->getMessage());
+                $this->logger->error("Failed to send mail notification via SMTP: " . $e->getMessage());
                 throw new MailNotificationException("Failed to send mail notification via SMTP: " . $e->getMessage());
             }
         }
@@ -234,27 +230,30 @@ EOL;
                 ],
             ]);
 
-            $logger = Logger::getInstance('logrotate');
-            $logger->info("Mail notification sent successfully via SES");
-
-            $client->sendEmail([
-                'Destination' => [
-                    'ToAddresses' => $this->mailConfig['recipients'],
-                ],
-                'Message' => [
-                    'Body' => [
-                        'Text' => [
+            try {
+                $client->sendEmail([
+                    'Destination' => [
+                        'ToAddresses' => $this->mailConfig['recipients'],
+                    ],
+                    'Message' => [
+                        'Body' => [
+                            'Text' => [
+                                'Charset' => 'UTF-8',
+                                'Data' => $message,
+                            ],
+                        ],
+                        'Subject' => [
                             'Charset' => 'UTF-8',
-                            'Data' => $message,
+                            'Data' => $subject,
                         ],
                     ],
-                    'Subject' => [
-                        'Charset' => 'UTF-8',
-                        'Data' => $subject,
-                    ],
-                ],
-                'Source' => $this->mailConfig['from'],
-            ]);
+                    'Source' => $this->mailConfig['from'],
+                ]);
+                $this->logger->info("Mail notification sent successfully via SES");
+            } catch (\Exception $e) {
+                $this->logger->error("Failed to send mail notification via SES: " . $e->getMessage());
+                throw new MailNotificationException("Failed to send mail notification via SES: " . $e->getMessage());
+            }
         }
     }
 
