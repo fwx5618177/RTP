@@ -63,8 +63,7 @@ class Config
 
         if ($this->logger) {
             $this->logger->debug('Config value retrieved', [
-                'key' => $key,
-                'value' => $value
+                'key' => $key
             ]);
         }
 
