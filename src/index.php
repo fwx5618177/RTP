@@ -12,7 +12,7 @@ try {
     $config->setLogger(Logger::getInstance('config'));
 
     // 初始化日志系统
-    $logDir = dirname($config->get('LOD_DIR'));
+    $logDir = $config->get('LOG_DIR');
     $logger = Logger::getInstance('app', $logDir);
     
     // Initialize log rotation service

@@ -16,22 +16,26 @@ class Logger extends MonologLogger
     {
         if (!isset(self::$instances[$name])) {
             $logger = new self($name);
-            
             // 默认日志目录为项目根目录下的 logs 目录
-            $logFile = $logDir ? rtrim($logDir, '/').'/'.$name.'.log' : __DIR__.'/../../logs/'.$name.'.log';
+            $logFile = $logDir ? __DIR__.'/../../'.rtrim($logDir, '/').'/'.$name.'.log' : __DIR__.'/../../logs/'.$name.'.log';
             
-            $stream = new StreamHandler($logFile, $level);
+            // 文件日志handler
+            $fileStream = new StreamHandler($logFile, $level);
             
             $formatter = new LineFormatter(
-                "[%datetime%] %channel%.%level_name%: %message% %context% %extra%\n",
+                "\033[36m[%datetime%]\033[0m \033[1m%level_name%\033[0m > %message% %context%\n",
                 'Y-m-d H:i:s',
                 true,
                 true
             );
             
-            $stream->setFormatter($formatter);
+            $fileStream->setFormatter($formatter);
+            $logger->pushHandler($fileStream);
             
-            $logger->pushHandler($stream);
+            // 终端输出handler
+            $consoleStream = new StreamHandler('php://stdout', $level);
+            $consoleStream->setFormatter($formatter);
+            $logger->pushHandler($consoleStream);
             $logger->pushProcessor(new IntrospectionProcessor());
             $logger->pushProcessor(new MemoryUsageProcessor());
             
