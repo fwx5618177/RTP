@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Server;
 
 use App\Http\Request;
 use App\Http\Response;
+use RtpBridge\Backend\Logger;
 use App\Routes\Router;
 use App\Middlewares\MiddlewareStack;
 
