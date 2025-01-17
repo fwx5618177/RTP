@@ -4,6 +4,8 @@ namespace App\Logs;
 
 use DateTime;
 use Exception;
+use App\Exceptions\LogRotateException;
+use App\Exceptions\MailNotificationException;
 
 class LogRotateService
 {
@@ -29,7 +31,14 @@ class LogRotateService
         $this->maxFiles = $maxFiles;
 
         if (!is_dir($this->logDir)) {
-            mkdir($this->logDir, 0755, true);
+            if (mkdir($this->logDir, 0755, true)) {
+                $logger = Logger::getInstance('logrotate');
+                $logger->info("Created log directory: {$this->logDir}");
+            } else {
+                $logger = Logger::getInstance('logrotate');
+                $logger->error("Failed to create log directory: {$this->logDir}");
+                throw new LogRotateException("Failed to create log directory: {$this->logDir}");
+            }
         }
     }
 
@@ -51,7 +60,9 @@ class LogRotateService
         $archivePath = "{$this->logDir}/{$this->logFile}.{$timestamp}.log";
 
         if (!rename($logPath, $archivePath)) {
-            throw new Exception("Failed to rotate log file: {$logPath}");
+            $logger = Logger::getInstance('logrotate');
+            $logger->error("Failed to rotate log file: {$logPath}");
+            throw new LogRotateException("Failed to rotate log file: {$logPath}");
         }
 
         // 设置归档日志文件权限
@@ -72,7 +83,13 @@ class LogRotateService
         $compressed = gzencode($data, 9);
 
         if (file_put_contents($compressedPath, $compressed)) {
+            $logger = Logger::getInstance('logrotate');
+            $logger->info("Successfully compressed log file: {$filePath}");
             unlink($filePath);
+        } else {
+            $logger = Logger::getInstance('logrotate');
+            $logger->error("Failed to compress log file: {$filePath}");
+            throw new LogRotateException("Failed to compress log file: {$filePath}");
         }
     }
 
@@ -95,7 +112,13 @@ class LogRotateService
 
             $filesToDelete = array_slice($files, 0, count($files) - $this->maxFiles);
             foreach ($filesToDelete as $file) {
-                unlink($file);
+                if (unlink($file)) {
+                    $logger = Logger::getInstance('logrotate');
+                    $logger->info("Deleted old log file: {$file}");
+                } else {
+                    $logger = Logger::getInstance('logrotate');
+                    $logger->error("Failed to delete old log file: {$file}");
+                }
             }
         }
     }
@@ -128,7 +151,9 @@ EOL;
         if (file_put_contents($configPath, $config)) {
             chmod($configPath, 0644);
         } else {
-            throw new Exception("Failed to write logrotate config");
+            $logger = Logger::getInstance('logrotate');
+            $logger->error("Failed to write logrotate config");
+            throw new LogRotateException("Failed to write logrotate config");
         }
     }
 
@@ -156,12 +181,18 @@ EOL;
         
         // 使用内置mail函数
         if ($this->mailConfig['driver'] === 'mail' && function_exists('mail')) {
-            mail(
+            if (!mail(
                 $this->mailConfig['recipients'],
                 $subject,
                 $message,
                 $this->buildMailHeaders()
-            );
+            )) {
+                $logger = Logger::getInstance('logrotate');
+                $logger->error("Failed to send mail notification");
+                throw new MailNotificationException("Failed to send mail notification");
+            }
+            $logger = Logger::getInstance('logrotate');
+            $logger->info("Mail notification sent successfully");
             return;
         }
 
@@ -180,8 +211,16 @@ EOL;
                 ->setTo($this->mailConfig['recipients'])
                 ->setBody($message);
 
-            $mailer->send($swiftMessage);
-            return;
+            try {
+                $mailer->send($swiftMessage);
+                $logger = Logger::getInstance('logrotate');
+                $logger->info("Mail notification sent successfully via SMTP");
+                return;
+            } catch (\Exception $e) {
+                $logger = Logger::getInstance('logrotate');
+                $logger->error("Failed to send mail notification via SMTP: " . $e->getMessage());
+                throw new MailNotificationException("Failed to send mail notification via SMTP: " . $e->getMessage());
+            }
         }
 
         // 使用第三方服务
@@ -194,6 +233,9 @@ EOL;
                     'secret' => $this->mailConfig['secret'],
                 ],
             ]);
+
+            $logger = Logger::getInstance('logrotate');
+            $logger->info("Mail notification sent successfully via SES");
 
             $client->sendEmail([
                 'Destination' => [
