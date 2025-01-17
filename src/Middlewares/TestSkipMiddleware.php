@@ -17,13 +17,9 @@ class TestSkipMiddleware
         // 测试截断请求
         if ($request->getHeader('X-Test-cutdown') === 'true') {
             $logger->info('TestSkipMiddleware: Cutting down request');
-            return; // 不调用next()，直接返回
-        }
-
-        // 测试next调用
-        if ($request->getHeader('X-Test-Next') === 'true') {
-            $logger->info('TestSkipMiddleware: Not Calling next middleware');
-            return $response->header('X-Test-Next', 'passed');
+            return $response->header('X-Test-cutdown', 'passed')->body([
+                'message' => 'Request was cut down',
+            ]);
         }
 
         // 默认继续执行下一个中间件

@@ -8,7 +8,7 @@ use App\Logs\Logger;
 
 class TestHeaderMiddleware
 {
-    public function handle(Request $request, Response $response, callable $next): void
+    public function handle(Request $request, Response $response, callable $next): Response
     {
         $logger = Logger::getInstance('middleware');
 
@@ -17,10 +17,9 @@ class TestHeaderMiddleware
 
         // 记录传入的header
         $headersConfig = $response->getHeader('X-Test-Middleware');
-
         $logger->info('TestHeaderMiddleware: Processing request', ['headers' => $headersConfig]);
 
-        // 继续执行下一个中间件
-        $next();
+        // 继续执行下一个中间件并返回响应
+        return $next();
     }
 }

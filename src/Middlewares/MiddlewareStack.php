@@ -14,32 +14,37 @@ class MiddlewareStack
         $this->middlewares = $middlewares;
     }
 
-    public function handle(Request $request, Response $response): Response
+    public function handle(Request $request, Response $response)
     {
-        // 如果没有中间件，直接返回响应
-        if (empty($this->middlewares)) {
-            return $response;
-        }
+        // 每次处理都创建新的中间件栈副本
+        $middlewares = $this->middlewares;
 
-        // 获取当前中间件
-        $middlewareClass = array_shift($this->middlewares);
-        $middleware = new $middlewareClass();
+        // 创建递归处理函数
+        $next = function (Request $request, Response $response) use (&$middlewares, &$next) {
+            if (empty($middlewares)) {
+                return [
+                    'type' => 'response',
+                    'response' => $response
+                ];
+            }
 
-        // 创建next标记函数
-        $nextCalled = false;
-        $next = function () use (&$nextCalled) {
-            $nextCalled = true;
+            $middlewareClass = array_shift($middlewares);
+            $middleware = new $middlewareClass();
+
+            // 执行中间件
+            $result = $middleware->handle($request, $response, $next);
+
+            // 确保返回数组格式
+            if (is_array($result)) {
+                return $result;
+            }
+
+            return [
+                'type' => 'response',
+                'response' => $result
+            ];
         };
 
-        // 执行当前中间件
-        $middleware->handle($request, $response, $next);
-
-        // 如果中间件没有调用next()，直接返回当前响应
-        if (!$nextCalled) {
-            return $response;
-        }
-
-        // 继续执行下一个中间件
-        return $this->handle($request, $response);
+        return $next($request, $response);
     }
 }

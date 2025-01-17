@@ -34,7 +34,11 @@ class Route
         $response = new Response();
 
         // 执行中间件栈
-        $response = $this->middlewareStack->handle($request, $response);
+        $result = $this->middlewareStack->handle($request, $response);
+
+        if (isset($result['type']) && $result['type'] === 'response') {
+            return $result['response'];
+        }
 
         // 执行控制器
         [$controllerClass, $methodName] = $this->handler;
