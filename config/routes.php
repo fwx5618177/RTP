@@ -6,7 +6,10 @@ return [
             'method' => 'GET',
             'path' => '/',
             'handler' => [\App\Controllers\HomeController::class, 'index'],
-            'middleware' => []
+            'middleware' => [
+                \App\Middlewares\TestSkipMiddleware::class,
+                \App\Middlewares\TestHeaderMiddleware::class,
+            ]
         ]
     ],
     'user_routes' => [

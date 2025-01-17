@@ -15,18 +15,18 @@ class Request
 
     public function __construct(
         string $method,
-        string $path,
-        array $server = [],
-        array $queryParams = [],
-        array $bodyParams = [],
+        ?string $path = '',
+        array $query = [],
+        array $headers = [],
         array $cookies = [],
-        array $files = []
+        array $files = [],
+        array $server = []
     ) {
         $this->method = strtoupper($method);
         $this->path = $path;
-        $this->queryParams = $queryParams;
-        $this->bodyParams = $bodyParams;
-        $this->headers = $this->extractHeaders($server);
+        $this->queryParams = $query;
+        $this->bodyParams = [];
+        $this->headers = array_merge($headers, $this->extractHeaders($server));
         $this->cookies = $cookies;
         $this->files = $files;
     }
@@ -36,11 +36,11 @@ class Request
         return new self(
             $_SERVER['REQUEST_METHOD'] ?? 'GET',
             $_SERVER['REQUEST_URI'] ?? '/',
-            $_SERVER,
             $_GET,
-            $_POST,
+            [], // headers
             $_COOKIE,
-            $_FILES
+            $_FILES,
+            $_SERVER
         );
     }
 
@@ -55,10 +55,23 @@ class Request
 
         // Parse headers
         $headers = [];
+        $server = [];
         while ($line = array_shift($lines)) {
             if (empty($line)) break;
-            [$name, $value] = explode(':', $line, 2);
-            $headers[trim($name)] = trim($value);
+
+            // 解析header行
+            if (str_contains($line, ':')) {
+                [$name, $value] = explode(':', $line, 2);
+                $name = trim($name);
+                $value = trim($value);
+
+                // 转换为$_SERVER格式
+                $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+                $server[$serverKey] = $value;
+
+                // 同时保留原始header
+                $headers[$name] = $value;
+            }
         }
 
         // Parse body
@@ -67,11 +80,11 @@ class Request
         return new self(
             $method,
             $path,
-            [], // server
             [], // query
-            [], // body
+            $headers, // headers
             [], // cookies
-            []  // files
+            [], // files
+            $server // server
         );
     }
 
@@ -80,9 +93,23 @@ class Request
         $headers = [];
         foreach ($server as $key => $value) {
             if (str_starts_with($key, 'HTTP_')) {
+                // 处理标准HTTP头
                 $headers[str_replace('_', '-', substr($key, 5))] = $value;
+            } elseif (in_array($key, [
+                'CONTENT_TYPE',
+                'CONTENT_LENGTH',
+                'CONTENT_MD5',
+            ])) {
+                // 处理特殊内容头
+                $headers[str_replace('_', '-', $key)] = $value;
             }
         }
+
+        // 从apache_request_headers()获取完整header（如果可用）
+        if (function_exists('apache_request_headers')) {
+            $headers = array_merge($headers, apache_request_headers());
+        }
+
         return $headers;
     }
 
@@ -109,6 +136,11 @@ class Request
     public function getHeaders(): array
     {
         return $this->headers;
+    }
+
+    public function header(string $name): ?string
+    {
+        return $this->headers[$name] ?? null;
     }
 
     public function getHeader(string $name): ?string

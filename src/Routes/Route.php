@@ -23,21 +23,23 @@ class Route
 
     public function matches(Request $request): bool
     {
+        $requestPath = rtrim($request->getPath(), '/');
+        $routePath = rtrim($this->path, '/');
         return $this->method === $request->getMethod() &&
-            $this->path === $request->getPath();
+            $routePath === $requestPath;
     }
 
     public function handle(Request $request): Response
     {
-        $response = $this->middlewareStack->handle($request);
+        $response = new Response();
 
-        if ($response) {
-            return $response;
-        }
+        // 执行中间件栈
+        $response = $this->middlewareStack->handle($request, $response);
 
+        // 执行控制器
         [$controllerClass, $methodName] = $this->handler;
         $container = $request->getContainer();
         $controller = new $controllerClass($container);
-        return $controller->$methodName($request);
+        return $controller->$methodName($request, $response);
     }
 }

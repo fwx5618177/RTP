@@ -23,7 +23,7 @@ class Config
     public static function getInstance(): self
     {
         if (self::$instance === null) {
-            self::$instance = new self(__DIR__.'/../../config/.env');
+            self::$instance = new self(__DIR__ . '/../../config/.env');
         }
         return self::$instance;
     }
@@ -36,7 +36,7 @@ class Config
     private function loadEnv(): void
     {
         if (!file_exists($this->envPath)) {
-            $message = '.env file not found at '.$this->envPath;
+            $message = '.env file not found at ' . $this->envPath;
             if ($this->logger) {
                 $this->logger->error($message);
             }
@@ -54,7 +54,7 @@ class Config
     public function get(string $key, $default = null)
     {
         $value = $_ENV[strtoupper($key)] ?? $default;
-        
+
         if ($value === null) {
             $message = "Config key '{$key}' not found";
             if ($this->logger) {
@@ -63,19 +63,13 @@ class Config
             throw new ConfigException($message);
         }
 
-        if ($this->logger) {
-            $this->logger->debug('Config value retrieved', [
-                'key' => $key
-            ]);
-        }
-
         return $value;
     }
 
     public function has(string $key): bool
     {
         $exists = isset($_ENV[strtoupper($key)]);
-        
+
         if ($this->logger) {
             $this->logger->debug('Config key check', [
                 'key' => $key,
@@ -90,9 +84,6 @@ class Config
     {
         if (function_exists('opcache_reset')) {
             opcache_reset();
-        }
-        if (function_exists('apc_clear_cache')) {
-            apc_clear_cache();
         }
     }
 }

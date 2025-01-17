@@ -56,9 +56,19 @@ class ApiServer
                 continue;
             }
 
+            // 设置连接超时
+            stream_set_timeout($conn, 30);
+
             stream_set_blocking($conn, false);
             $request = Request::createFromStream($conn);
             $request->setContainer(Container::getInstance());
+
+            // 记录请求开始
+            $this->logger->debug('Request received', [
+                'method' => $request->getMethod(),
+                'path' => $request->getPath(),
+                'remote_address' => stream_socket_get_name($conn, true)
+            ]);
 
             try {
                 // 路由匹配

@@ -20,6 +20,11 @@ class Response
         return $this->statusCode;
     }
 
+    public function getHeader(string $name): ?string
+    {
+        return $this->headers[$name] ?? null;
+    }
+
     public function getHeaders(): array
     {
         return $this->headers;
