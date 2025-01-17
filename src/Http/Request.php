@@ -11,6 +11,7 @@ class Request
     private array $headers;
     private array $cookies;
     private array $files;
+    private $container;
 
     public function __construct(
         string $method,
@@ -92,5 +93,15 @@ class Request
     public function getFiles(): array
     {
         return $this->files;
+    }
+
+    public function setContainer($container): void
+    {
+        $this->container = $container;
+    }
+
+    public function getContainer()
+    {
+        return $this->container;
     }
 }

@@ -3,18 +3,19 @@
 namespace App\Repositories;
 
 use App\DTO\UserDTO;
-use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityRepository;
 
 class UserRepository extends EntityRepository
 {
-    public function __construct(EntityManagerInterface $entityManager)
+    public function __construct(EntityManager $entityManager)
     {
         parent::__construct($entityManager, $entityManager->getClassMetadata(UserDTO::class));
     }
 
     public function create(UserDTO $userDTO): UserDTO
     {
+
         $this->_em->persist($userDTO);
         $this->_em->flush();
         return $userDTO;

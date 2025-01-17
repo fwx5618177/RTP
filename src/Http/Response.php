@@ -50,10 +50,12 @@ class Response
 
     public function send(): void
     {
-        http_response_code($this->statusCode);
+        if (!headers_sent()) {
+            http_response_code($this->statusCode);
 
-        foreach ($this->headers as $name => $value) {
-            header("$name: $value");
+            foreach ($this->headers as $name => $value) {
+                header("$name: $value");
+            }
         }
 
         if (!empty($this->body)) {

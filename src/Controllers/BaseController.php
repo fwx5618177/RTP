@@ -2,36 +2,30 @@
 
 namespace App\Controllers;
 
-use Doctrine\ORM\EntityManagerInterface;
+use App\Http\Response;
+use Doctrine\ORM\EntityManager;
 use Psr\Container\ContainerInterface;
 
 abstract class BaseController
 {
-    protected EntityManagerInterface $entityManager;
+    protected EntityManager $entityManager;
     protected ContainerInterface $container;
 
     public function __construct(ContainerInterface $container)
     {
         $this->container = $container;
-        $this->entityManager = $container->get(EntityManagerInterface::class);
+        $this->entityManager = $container->get(EntityManager::class);
     }
-}
 
     protected function successResponse($data, int $statusCode = 200): Response
     {
-        return new Response(
-            $statusCode,
-            ['Content-Type' => 'application/json'],
-            ['success' => true, 'data' => $data]
-        );
+        return (new Response(['success' => true, 'data' => $data], $statusCode))
+            ->header('Content-Type', 'application/json');
     }
 
     protected function errorResponse(string $message, int $statusCode = 400): Response
     {
-        return new Response(
-            $statusCode,
-            ['Content-Type' => 'application/json'],
-            ['success' => false, 'error' => $message]
-        );
+        return (new Response(['success' => false, 'error' => $message], $statusCode))
+            ->header('Content-Type', 'application/json');
     }
 }

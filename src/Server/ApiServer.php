@@ -30,6 +30,7 @@ class ApiServer
     {
         // 创建请求和响应对象
         $request = Request::createFromGlobals();
+        $request->setContainer(Container::getInstance());
 
         try {
             // 路由匹配

@@ -36,7 +36,8 @@ class Route
         }
 
         [$controllerClass, $methodName] = $this->handler;
-        $controller = new $controllerClass();
+        $container = $request->getContainer();
+        $controller = new $controllerClass($container);
         return $controller->$methodName($request);
     }
 }

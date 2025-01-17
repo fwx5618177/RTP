@@ -1,6 +1,14 @@
 <?php
 
 return [
+    'default_routes' => [
+        [
+            'method' => 'GET',
+            'path' => '/',
+            'handler' => [\App\Controllers\HomeController::class, 'index'],
+            'middleware' => []
+        ]
+    ],
     'user_routes' => [
         [
             'method' => 'POST',

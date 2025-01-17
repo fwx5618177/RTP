@@ -77,6 +77,8 @@ try {
     // 初始化API服务器
     $apiServer = new ApiServer();
 
+    $apiServer->run();
+
     // 主应用循环
     $logger->info('Application started', [
         'environment' => $config->get('APP_ENV', 'production')
