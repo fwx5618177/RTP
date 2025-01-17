@@ -44,6 +44,37 @@ class Request
         );
     }
 
+    public static function createFromStream($stream): self
+    {
+        $rawRequest = stream_get_contents($stream);
+        $lines = explode("\r\n", $rawRequest);
+
+        // Parse request line
+        $requestLine = array_shift($lines);
+        [$method, $path] = explode(' ', $requestLine);
+
+        // Parse headers
+        $headers = [];
+        while ($line = array_shift($lines)) {
+            if (empty($line)) break;
+            [$name, $value] = explode(':', $line, 2);
+            $headers[trim($name)] = trim($value);
+        }
+
+        // Parse body
+        $body = implode("\r\n", $lines);
+
+        return new self(
+            $method,
+            $path,
+            [], // server
+            [], // query
+            [], // body
+            [], // cookies
+            []  // files
+        );
+    }
+
     private function extractHeaders(array $server): array
     {
         $headers = [];

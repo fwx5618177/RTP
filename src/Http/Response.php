@@ -50,16 +50,33 @@ class Response
 
     public function send(): void
     {
-        if (!headers_sent()) {
-            http_response_code($this->statusCode);
+        http_response_code($this->statusCode);
+        foreach ($this->headers as $name => $value) {
+            header("$name: $value");
+        }
+        echo $this->body;
+    }
 
-            foreach ($this->headers as $name => $value) {
-                header("$name: $value");
-            }
+    public function __toString(): string
+    {
+        $response = "HTTP/1.1 {$this->statusCode}\r\n";
+
+        // Add headers
+        foreach ($this->headers as $name => $value) {
+            $response .= "{$name}: {$value}\r\n";
         }
 
-        if (!empty($this->body)) {
-            echo $this->body;
+        // Add content length if not set
+        if (!isset($this->headers['Content-Length'])) {
+            $response .= "Content-Length: " . strlen($this->body) . "\r\n";
         }
+
+        // End headers
+        $response .= "\r\n";
+
+        // Add body
+        $response .= $this->body;
+
+        return $response;
     }
 }
