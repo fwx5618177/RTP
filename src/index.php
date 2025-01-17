@@ -7,27 +7,26 @@ use App\Logs\Logger;
 use App\Logs\LogRotateService;
 
 try {
-    // Initialize configuration
+    // 初始化 Config 实例
     $config = Config::getInstance();
-    $getConfig = $config->getLogConfig();
+    $config->setLogger(Logger::getInstance('config'));
 
-    // Initialize logger
-    $logDir = dirname($getConfig['path']);
-    $logger = Logger::getInstance('app', $logConfig['path']);
+    // 初始化日志系统
+    $logDir = dirname($config->get('LOD_DIR'));
+    $logger = Logger::getInstance('app', $logDir);
     
     // Initialize log rotation service
     $logRotateService = new LogRotateService(
         $logDir,
-        basename($logConfig['path']),
-        $logConfig['max_size'],
-        $logConfig['max_files'],
-        $logConfig['retention_days']
+        $config->get('LOG_ROTATE_FILE'),
+        $config->get('LOG_MAX_SIZE'),
+        $config->get('LOG_MAX_FILES'),
+        $config->get('LOG_RETENTION_DAYS'),
     );
 
     // Log application start
     $logger->info('Application started', [
-        'environment' => $config->get('app.env', 'production'),
-        'log_level' => $logConfig['level']
+        'environment' => $config->get('APP_ENV', 'production')
     ]);
 
     // Perform log rotation

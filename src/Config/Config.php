@@ -21,7 +21,7 @@ class Config
     public static function getInstance(): self
     {
         if (self::$instance === null) {
-            self::$instance = new self(__DIR__.'/../../.env');
+            self::$instance = new self(__DIR__.'/../../config/.env');
         }
         return self::$instance;
     }

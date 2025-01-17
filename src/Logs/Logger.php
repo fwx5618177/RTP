@@ -12,7 +12,7 @@ class Logger extends MonologLogger
 {
     private static array $instances = [];
 
-    public static function getInstance(string $name = 'app', string $logDir = null, int $level = MonologLogger::DEBUG): self
+    public static function getInstance(string $name = 'app', ?string $logDir = null, int $level = MonologLogger::DEBUG): self
     {
         if (!isset(self::$instances[$name])) {
             $logger = new self($name);
@@ -46,60 +46,57 @@ class Logger extends MonologLogger
         parent::__construct($name);
     }
 
-    public function debug(string $message, array $context = [], bool $withColor = true): void
+    public function debug($message, array $context = []): void
     {
-        $this->logWithColor('debug', $message, $context, $withColor);
+        $this->logWithColor('debug', $message, $context);
     }
 
-    public function info(string $message, array $context = [], bool $withColor = true): void
+    public function info($message, array $context = []): void
     {
-        $this->logWithColor('info', $message, $context, $withColor);
+        $this->logWithColor('info', $message, $context);
     }
 
-    public function warning(string $message, array $context = [], bool $withColor = true): void
+    public function warning($message, array $context = []): void
     {
-        $this->logWithColor('warning', $message, $context, $withColor);
+        $this->logWithColor('warning', $message, $context);
     }
 
-    public function error(string $message, array $context = [], bool $withColor = true): void
+    public function error($message, array $context = []): void
     {
-        $this->logWithColor('error', $message, $context, $withColor);
+        $this->logWithColor('error', $message, $context);
     }
 
-    public function critical(string $message, array $context = [], bool $withColor = true): void
+    public function critical($message, array $context = []): void
     {
-        $this->logWithColor('critical', $message, $context, $withColor);
+        $this->logWithColor('critical', $message, $context);
     }
 
-    public function alert(string $message, array $context = [], bool $withColor = true): void
+    public function alert($message, array $context = []): void
     {
-        $this->logWithColor('alert', $message, $context, $withColor);
+        $this->logWithColor('alert', $message, $context);
     }
 
-    public function emergency(string $message, array $context = [], bool $withColor = true): void
+    public function emergency($message, array $context = []): void
     {
-        $this->logWithColor('emergency', $message, $context, $withColor);
+        $this->logWithColor('emergency', $message, $context);
     }
 
-    private function logWithColor(string $level, string $message, array $context = [], bool $withColor = true): void
+    private function logWithColor(string $level, $message, array $context = []): void
     {
-        if ($withColor) {
-            $colors = [
-                'debug' => "\033[36m", // cyan
-                'info' => "\033[32m",  // green
-                'notice' => "\033[34m", // blue
-                'warning' => "\033[33m", // yellow
-                'error' => "\033[31m", // red
-                'critical' => "\033[35m", // magenta
-                'alert' => "\033[41m", // red background
-                'emergency' => "\033[41m", // red background
-            ];
+        $colors = [
+            'debug' => "\033[36m", // cyan
+            'info' => "\033[32m",  // green
+            'notice' => "\033[34m", // blue
+            'warning' => "\033[33m", // yellow
+            'error' => "\033[31m", // red
+            'critical' => "\033[35m", // magenta
+            'alert' => "\033[41m", // red background
+            'emergency' => "\033[41m", // red background
+        ];
 
-            $color = $colors[$level] ?? "\033[0m";
-            $reset = "\033[0m";
-            $message = $color.$message.$reset;
-        }
-
+        $color = $colors[$level] ?? "\033[0m";
+        $reset = "\033[0m";
+        $message = $color.$message.$reset;
         $this->log($level, $message, $context);
     }
 }

@@ -1,0 +1,2 @@
+[2025-01-17 10:58:00] logrotate.INFO: [32mNo rotation needed for log file: ./rotate[0m  {"memory_usage":"2 MB","file":"/Users/fengwenxuan/Desktop/php/rtp-bridge-backend/src/Logs/Logger.php","line":100,"class":"App\\Logs\\Logger","callType":"->","function":"logWithColor"}
+[2025-01-17 10:58:02] logrotate.INFO: [32mNo rotation needed for log file: ./rotate[0m  {"memory_usage":"2 MB","file":"/Users/fengwenxuan/Desktop/php/rtp-bridge-backend/src/Logs/Logger.php","line":100,"class":"App\\Logs\\Logger","callType":"->","function":"logWithColor"}
