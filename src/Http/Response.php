@@ -41,13 +41,33 @@ class Response
         return $this;
     }
 
+    public function setStatusCode(int $statusCode): self
+    {
+        $this->statusCode = $statusCode;
+        return $this;
+    }
+
     public function body(array|string $body): self
     {
         $this->body = is_array($body) ? json_encode($body) : $body;
         return $this;
     }
 
-    public function header(string $name, string $value): self
+    public function setBody(array|string $body): self
+    {
+        $this->body = is_array($body) ? json_encode($body) : $body;
+        return $this;
+    }
+
+    public function header(string $name, string $value, bool $replace = true): self
+    {
+        if ($replace || !isset($this->headers[$name])) {
+            $this->headers[$name] = $value;
+        }
+        return $this;
+    }
+
+    public function setHeader(string $name, string $value): self
     {
         $this->headers[$name] = $value;
         return $this;

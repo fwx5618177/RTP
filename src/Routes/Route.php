@@ -4,21 +4,20 @@ namespace App\Routes;
 
 use App\Http\Request;
 use App\Http\Response;
-use App\Middlewares\MiddlewareStack;
 
 class Route
 {
     private string $method;
     private string $path;
     private array $handler;
-    private MiddlewareStack $middlewareStack;
+    private array $middlewares = [];
 
-    public function __construct(string $method, string $path, array $handler, array $middleware = [])
+    public function __construct(string $method, string $path, array $handler, array $middlewares = [])
     {
         $this->method = $method;
         $this->path = $path;
         $this->handler = $handler;
-        $this->middlewareStack = new MiddlewareStack($middleware);
+        $this->middlewares = $middlewares;
     }
 
     public function matches(Request $request): bool
@@ -29,21 +28,20 @@ class Route
             $routePath === $requestPath;
     }
 
+    public function getMiddlewares(): array
+    {
+        return $this->middlewares;
+    }
+
     public function handle(Request $request): Response
     {
-        $response = new Response();
-
-        // 执行中间件栈
-        $result = $this->middlewareStack->handle($request, $response);
-
-        if (isset($result['type']) && $result['type'] === 'response') {
-            return $result['response'];
-        }
-
-        // 执行控制器
         [$controllerClass, $methodName] = $this->handler;
         $container = $request->getContainer();
+
+        // 使用容器创建控制器实例
         $controller = new $controllerClass($container);
-        return $controller->$methodName($request, $response);
+
+        // 调用控制器方法
+        return $controller->$methodName($request);
     }
 }

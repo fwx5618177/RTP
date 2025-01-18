@@ -6,23 +6,23 @@ use App\Http\Request;
 use App\Http\Response;
 use App\Logs\Logger;
 
-class TestSkipMiddleware
+class TestSkipMiddleware implements MiddlewareInterface
 {
-    public function handle(Request $request, Response $response, callable $next)
+    public function process(Request $request, Response $response, callable $next): Response
     {
         $logger = Logger::getInstance('middleware');
-
-        $logger->info('TestSkipMiddleware: Processing request');
-
-        // 测试截断请求
-        if ($request->getHeader('X-Test-cutdown') === 'true') {
+        
+        // 前置检查，可以决定是否继续处理
+        if ($request->getHeader('x-test-cutdown') === 'true') {
             $logger->info('TestSkipMiddleware: Cutting down request');
-            return $response->header('X-Test-cutdown', 'passed')->body([
-                'message' => 'Request was cut down',
-            ]);
+            return $response
+                ->setHeader('x-test-cutdown', 'passed')
+                ->setBody([
+                    'message' => 'Request was cut down'
+                ]);
         }
 
-        // 默认继续执行下一个中间件
-        $next();
+        // 继续处理链
+        return $next($request, $response);
     }
 }

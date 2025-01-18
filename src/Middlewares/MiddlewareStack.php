@@ -4,91 +4,57 @@ namespace App\Middlewares;
 
 use App\Http\Request;
 use App\Http\Response;
-use Swoole\Coroutine;
 
 class MiddlewareStack
 {
-    private array $middlewares;
+    private array $middlewares = [];
+    private int $currentIndex = 0;
 
-    public function __construct(array $middlewares = [])
+    public function add($middleware): self
     {
-        $this->middlewares = $middlewares;
+        $this->middlewares[] = $middleware;
+        return $this;
     }
 
-    public function handle(Request $request, Response $response)
+    public function handle(Request $request, Response $response): array
     {
-        // 在协程环境下运行中间件
-        if (Coroutine::getCid() > 0) {
-            return $this->handleInCoroutine($request, $response);
+        // 这个方法是为了兼容旧代码，实际使用 process 方法
+        $result = $this->process($request, $response);
+        
+        // 如果是中间件返回的响应，包装成特定格式
+        if ($result instanceof Response) {
+            return [
+                'type' => 'response',
+                'response' => $result
+            ];
         }
 
-        return $this->handleSync($request, $response);
+        // 如果没有中间件返回响应，允许继续处理
+        return [
+            'type' => 'continue',
+            'request' => $request,
+            'response' => $response
+        ];
     }
 
-    private function handleInCoroutine(Request $request, Response $response)
+    public function process(Request $request, Response $response): Response
     {
-        $middlewares = $this->middlewares;
-
-        $next = function (Request $request, Response $response) use (&$middlewares, &$next) {
-            if (empty($middlewares)) {
-                return [
-                    'type' => 'response',
-                    'response' => $response
-                ];
+        $next = function (Request $request, Response $response) {
+            if ($this->currentIndex >= count($this->middlewares)) {
+                return $response;
             }
 
-            $middlewareClass = array_shift($middlewares);
-            $middleware = new $middlewareClass();
+            $middleware = $this->middlewares[$this->currentIndex];
+            $this->currentIndex++;
 
-            // 在协程中执行中间件
-            $result = Coroutine::create(function () use ($middleware, $request, $response, $next) {
-                return $middleware->handle($request, $response, $next);
+            // 如果是字符串类名，实例化中间件
+            if (is_string($middleware)) {
+                $middleware = new $middleware();
+            }
+
+            return $middleware->process($request, $response, function (Request $req, Response $res) {
+                return $this->process($req, $res);
             });
-
-            // 等待协程完成
-            $result = Coroutine::yield($result);
-
-            // 确保返回数组格式
-            if (is_array($result)) {
-                return $result;
-            }
-
-            return [
-                'type' => 'response',
-                'response' => $result
-            ];
-        };
-
-        return $next($request, $response);
-    }
-
-    private function handleSync(Request $request, Response $response)
-    {
-        $middlewares = $this->middlewares;
-
-        $next = function (Request $request, Response $response) use (&$middlewares, &$next) {
-            if (empty($middlewares)) {
-                return [
-                    'type' => 'response',
-                    'response' => $response
-                ];
-            }
-
-            $middlewareClass = array_shift($middlewares);
-            $middleware = new $middlewareClass();
-
-            // 同步执行中间件
-            $result = $middleware->handle($request, $response, $next);
-
-            // 确保返回数组格式
-            if (is_array($result)) {
-                return $result;
-            }
-
-            return [
-                'type' => 'response',
-                'response' => $result
-            ];
         };
 
         return $next($request, $response);

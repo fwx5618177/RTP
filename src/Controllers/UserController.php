@@ -7,38 +7,40 @@ use App\Http\Response;
 use App\DTO\UserDTO;
 use App\Services\UserService;
 use App\Exceptions\ValidationException;
+use Psr\Container\ContainerInterface;
 
-class UserController
+class UserController extends BaseController
 {
-    public function __construct(
-        private UserService $userService
-    ) {}
+    private UserService $userService;
+
+    public function __construct(ContainerInterface $container)
+    {
+        parent::__construct($container);
+        $this->userService = $container->get(UserService::class);
+    }
+
+    public function index(Request $request): Response
+    {
+        // 临时返回测试数据
+        return $this->successResponse([
+            'message' => 'User list endpoint',
+            'status' => 'success'
+        ]);
+    }
 
     public function create(Request $request): Response
     {
-        $data = $request->getBodyParams();
-
         try {
-            $userDTO = new UserDTO(
-                null,
-                $data['username'],
-                $data['email'],
-                password_hash($data['password'], PASSWORD_DEFAULT),
-                new \DateTimeImmutable()
-            );
+            // 1. 请求验证和转换为 DTO
+            $userDTO = UserDTO::fromRequest($request);
 
-            $createdUser = $this->userService->createUser($userDTO);
+            // 2. 调用 Service 处理业务逻辑
+            $user = $this->userService->createUser($userDTO);
 
-            return new Response(201, ['Content-Type' => 'application/json'], [
-                'id' => $createdUser->id,
-                'username' => $createdUser->username,
-                'email' => $createdUser->email,
-                'createdAt' => $createdUser->createdAt->format('Y-m-d H:i:s')
-            ]);
+            // 3. 转换响应
+            return $this->successResponse(UserDTO::fromEntity($user));
         } catch (ValidationException $e) {
-            return new Response(400, ['Content-Type' => 'application/json'], [
-                'error' => $e->getMessage()
-            ]);
+            return $this->errorResponse($e->getMessage(), 422);
         }
     }
 

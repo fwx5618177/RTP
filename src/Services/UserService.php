@@ -3,40 +3,44 @@
 namespace App\Services;
 
 use App\DTO\UserDTO;
-use App\Repositories\UserRepository;
-use App\Exceptions\ValidationException;
+use Doctrine\ORM\EntityManager;
 
 class UserService
 {
-    public function __construct(
-        private UserRepository $userRepository
-    ) {}
+    private EntityManager $entityManager;
 
-    public function createUser(UserDTO $userDTO): UserDTO
+    public function __construct(EntityManager $entityManager)
     {
-        if ($this->userRepository->usernameExists($userDTO->username)) {
-            throw new ValidationException('Username already exists');
-        }
-
-        if ($this->userRepository->emailExists($userDTO->email)) {
-            throw new ValidationException('Email already exists');
-        }
-
-        return $this->userRepository->create($userDTO);
+        $this->entityManager = $entityManager;
     }
 
-    public function getUserById(int $id): ?UserDTO
+    public function getUsers()
     {
-        return $this->userRepository->findById($id);
+        // 临时返回测试数据
+        return [];
     }
 
-    public function updateUser(UserDTO $userDTO): UserDTO
+    public function createUser(UserDTO $userDTO)
     {
-        return $this->userRepository->update($userDTO);
+        // 临时实现
+        return null;
     }
 
-    public function deleteUser(int $id): void
+    public function getUserById(int $id)
     {
-        $this->userRepository->delete($id);
+        // 临时实现
+        return null;
+    }
+
+    public function updateUser(UserDTO $userDTO)
+    {
+        // 临时实现
+        return null;
+    }
+
+    public function deleteUser(int $id)
+    {
+        // 临时实现
+        return true;
     }
 }
