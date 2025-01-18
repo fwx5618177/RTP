@@ -4,9 +4,9 @@
     "type": "project",
     "require": {
         "php": "^8.0",
+        "ext-swoole": "*",
         "doctrine/migrations": "^3.8",
         "doctrine/orm": "^3.3",
-        "guzzlehttp/guzzle": "^7.0",
         "monolog/monolog": "^2.0",
         "php-di/php-di": "^7.0",
         "symfony/cache": "^7.2",
@@ -30,5 +30,8 @@
         "post-autoload-dump": [
             "App\\Config\\Config::clearCache"
         ]
+    },
+    "require-dev": {
+        "swoole/ide-helper": "^6.0"
     }
 }
