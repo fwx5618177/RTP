@@ -74,7 +74,7 @@ try {
     // 初始化API服务器
     $apiServer = new ApiServer();
 
-    $apiServer->run($config->get('APP_HOST'), (int)$config->get('APP_PORT'));
+    $apiServer->run((int)$config->get('APP_PORT'));
 
     // 主应用循环
     $logger->info('Application started', [

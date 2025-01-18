@@ -26,8 +26,9 @@ class ApiServer
         $this->logger = Container::getInstance()->get(Logger::class);
     }
 
-    public function run($host, $port): void
+    public function run($port): void
     {
+        $host = '0.0.0.0';
         $this->logger->info("Starting Swoole HTTP server on http://{$host}:{$port}");
 
         $http = new \Swoole\Http\Server($host, $port);
