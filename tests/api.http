@@ -1,35 +1,90 @@
-### 1. 测试正常流程 - 所有中间件正常执行
-GET http://localhost:9501/api/users
-Content-Type: application/json
+###############################################
+# 基础路由测试
+###############################################
 
-### 2. 测试 TestConditionMiddleware 截断
-GET http://localhost:9501/api/users
-Content-Type: application/json
-x-stop-here: true
-
-### 3. 测试 TestConditionMiddleware 跳过
-GET http://localhost:9501/api/users
-Content-Type: application/json
-x-skip-condition: true
-
-### 4. 测试 TestSkipMiddleware 截断
-GET http://localhost:9501/api/users
-Content-Type: application/json
-x-test-cutdown: true
-
-### 5. 测试首页路由（只有全局中间件）
+### 1. 测试首页路由
 GET http://localhost:9501/
 Content-Type: application/json
 
-### 6. 测试用户创建
+### 2. 测试首页路由（带全局中间件测试）
+GET http://localhost:9501/
+Content-Type: application/json
+x-stop-here: true
+
+### 3. 测试首页路由 中间件跳过
+GET http://localhost:9501/
+Content-Type: application/json
+x-skip-condition: true
+
+###############################################
+# /api/test 路由组测试
+###############################################
+
+### 3. 测试 /api/test 基础访问
+GET http://localhost:9501/api/test
+Content-Type: application/json
+
+### 4. 测试 /api/test 中间件行为
+GET http://localhost:9501/api/test
+Content-Type: application/json
+x-stop-here: true
+
+### 5. 测试 /api/test 中间件跳过
+GET http://localhost:9501/api/test
+Content-Type: application/json
+x-skip-condition: true
+
+###############################################
+# /api/users 路由组测试
+###############################################
+
+### 6. 获取用户列表
+GET http://localhost:9501/api/users
+Content-Type: application/json
+
+### 7. 创建新用户
 POST http://localhost:9501/api/users
 Content-Type: application/json
 
 {
-    "name": "test user",
-    "email": "test@example.com"
+    "username": "test_user",
+    "email": "test@example.com",
+    "password": "password123"
 }
 
-### 7. 测试获取特定用户
+### 8. 获取特定用户
 GET http://localhost:9501/api/users/1
 Content-Type: application/json
+
+### 9. 更新用户
+PUT http://localhost:9501/api/users/1
+Content-Type: application/json
+
+{
+    "username": "updated_user",
+    "email": "updated@example.com",
+    "password": "newpassword123"
+}
+
+### 10. 删除用户
+DELETE http://localhost:9501/api/users/1
+Content-Type: application/json
+
+###############################################
+# 中间件特性测试
+###############################################
+
+### 11. 测试条件中间件截断
+GET http://localhost:9501/api/users
+Content-Type: application/json
+x-stop-here: true
+
+### 12. 测试条件中间件跳过
+GET http://localhost:9501/api/users
+Content-Type: application/json
+x-skip-condition: true
+
+### 13. 测试流程中间件
+GET http://localhost:9501/api/users
+Content-Type: application/json
+x-test-cutdown: true

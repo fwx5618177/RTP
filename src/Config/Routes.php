@@ -15,7 +15,14 @@ return function (Router $router) {
     $router->addGlobalMiddleware(new TestFlowMiddleware());
 
     // 基础路由
-    $router->add('GET', '/', [HomeController::class, 'index']);
+    $router->add('GET', '/', [HomeController::class, 'index'], [new TestConditionMiddleware()]);
+
+    $router->group([
+        'prefix' => '/api/test',
+        'middleware' => [new TestConditionMiddleware()]
+    ], function ($route) {
+        $route->add('GET', '/', [HomeController::class, 'index']);
+    });
 
     // 用户相关路由组
     $router->group([

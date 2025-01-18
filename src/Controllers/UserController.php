@@ -49,17 +49,17 @@ class UserController extends BaseController
         $user = $this->userService->getUserById($id);
 
         if (!$user) {
-            return new Response(404, ['Content-Type' => 'application/json'], [
+            return new Response([
                 'error' => 'User not found'
-            ]);
+            ], 404);
         }
 
-        return new Response(200, ['Content-Type' => 'application/json'], [
+        return new Response([
             'id' => $user->id,
             'username' => $user->username,
             'email' => $user->email,
             'createdAt' => $user->createdAt->format('Y-m-d H:i:s')
-        ]);
+        ], 200);
     }
 
     public function update(Request $request, int $id): Response
