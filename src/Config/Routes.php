@@ -8,8 +8,9 @@ use App\Controllers\HomeController;
 use App\Controllers\UserController;
 use App\Middlewares\TestFlowMiddleware;
 use App\Middlewares\TestConditionMiddleware;
+use App\Routes\Router;
 
-return function ($router) {
+return function (Router $router) {
     // 添加全局中间件
     $router->addGlobalMiddleware(new TestFlowMiddleware());
 

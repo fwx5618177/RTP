@@ -9,6 +9,9 @@ use App\Http\Response;
 use App\Logs\Logger;
 use App\Routes\Router;
 use App\Utils\Container;
+use Swoole\Http\Server;
+use Swoole\Http\Request as SwooleRequest;
+use Swoole\Http\Response as SwooleResponse;
 
 class ApiServer
 {
@@ -28,13 +31,13 @@ class ApiServer
         $host = '0.0.0.0';
         $this->logger->info("Starting Swoole HTTP server on http://{$host}:{$port}");
 
-        $http = new \Swoole\Http\Server($host, $port);
+        $http = new Server($host, $port);
 
-        $http->on('start', function ($server) use ($host, $port) {
+        $http->on('start', function () use ($host, $port) {
             $this->logger->info("Swoole HTTP server started at http://{$host}:{$port}");
         });
 
-        $http->on('request', function (\Swoole\Http\Request $swooleRequest, \Swoole\Http\Response $swooleResponse) {
+        $http->on('request', function (SwooleRequest $swooleRequest, SwooleResponse $swooleResponse) {
             try {
                 $request = Request::createFromSwoole($swooleRequest);
                 $request->setContainer(Container::getInstance());
@@ -52,7 +55,8 @@ class ApiServer
                 $statusCode = is_int($e->getCode()) && $e->getCode() >= 400 ? $e->getCode() : 500;
                 $errorResponse = new Response([
                     'error' => $e->getMessage(),
-                    'code' => $statusCode
+                    'code' => $statusCode,
+                    'success' => false
                 ], $statusCode);
 
                 $swooleResponse->status($statusCode);

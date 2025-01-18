@@ -44,26 +44,6 @@ class Router
         });
     }
 
-    public function addRoute(string $method, string $path, array $controllerCallable, array $middleware = []): Route
-    {
-        [$controllerClass, $methodName] = $controllerCallable;
-        $route = new Route($method, $path, [$controllerClass, $methodName], $middleware);
-        $this->routes[] = $route;
-        return $route;
-    }
-
-    public function loadRoutes(array $routes): void
-    {
-        foreach ($routes as $route) {
-            $this->addRoute(
-                $route['method'],
-                $route['path'],
-                $route['handler'],
-                $route['middleware']
-            );
-        }
-    }
-
     public function match(Request $request): Route
     {
         foreach ($this->routes as $route) {
