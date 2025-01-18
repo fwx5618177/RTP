@@ -88,6 +88,53 @@ class Request
         );
     }
 
+    public static function createFromSwoole(\Swoole\Http\Request $swooleRequest): self
+    {
+        // 解析请求路径和查询参数
+        $uri = $swooleRequest->server['request_uri'];
+        $queryString = $swooleRequest->server['query_string'] ?? '';
+        parse_str($queryString, $queryParams);
+
+        // 转换headers
+        $headers = [];
+        foreach ($swooleRequest->header as $name => $value) {
+            $headers[$name] = $value;
+        }
+
+        // 转换cookies
+        $cookies = $swooleRequest->cookie ?? [];
+
+        // 转换files
+        $files = [];
+        if (!empty($swooleRequest->files)) {
+            foreach ($swooleRequest->files as $field => $file) {
+                $files[$field] = [
+                    'name' => $file['name'],
+                    'type' => $file['type'],
+                    'tmp_name' => $file['tmp_name'],
+                    'error' => $file['error'],
+                    'size' => $file['size']
+                ];
+            }
+        }
+
+        // 转换server变量
+        $server = [];
+        foreach ($swooleRequest->server as $key => $value) {
+            $server[strtoupper($key)] = $value;
+        }
+
+        return new self(
+            $swooleRequest->server['request_method'],
+            $uri,
+            $queryParams,
+            $headers,
+            $cookies,
+            $files,
+            $server
+        );
+    }
+
     private function extractHeaders(array $server): array
     {
         $headers = [];

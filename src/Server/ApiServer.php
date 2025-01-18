@@ -26,66 +26,50 @@ class ApiServer
         $this->logger = Container::getInstance()->get(Logger::class);
     }
 
-    public function run(): void
+    public function run($host, $port): void
     {
-        $host = '0.0.0.0';
-        $port = 8080;
+        $this->logger->info("Starting Swoole HTTP server on http://{$host}:{$port}");
 
-        $this->logger->info("Starting HTTP server on http://{$host}:{$port}");
+        $http = new \Swoole\Http\Server($host, $port);
 
-        $socket = stream_socket_server("tcp://{$host}:{$port}", $errno, $errstr);
-        if (!$socket) {
-            $this->logger->error("Failed to start server: {$errstr} ({$errno})");
-            exit(1);
-        }
+        $http->on('start', function ($server) use ($host, $port) {
+            $this->logger->info("Swoole HTTP server started at http://{$host}:{$port}");
+        });
 
-        // 验证socket是否绑定成功
-        $socketName = stream_socket_get_name($socket, false);
-        $this->logger->debug("Socket created", [
-            'address' => $socketName,
-            'host' => $host,
-            'port' => $port
-        ]);
-
-        stream_set_blocking($socket, false);
-
-        while (true) {
-            $conn = @stream_socket_accept($socket, 0);
-            if ($conn === false) {
-                usleep(10000); // 10ms
-                continue;
-            }
-
-            // 设置连接超时
-            stream_set_timeout($conn, 30);
-
-            stream_set_blocking($conn, false);
-            $request = Request::createFromStream($conn);
-            $request->setContainer(Container::getInstance());
-
-            // 记录请求开始
-            $this->logger->debug('Request received', [
-                'method' => $request->getMethod(),
-                'path' => $request->getPath(),
-                'remote_address' => stream_socket_get_name($conn, true)
-            ]);
-
+        $http->on('request', function (\Swoole\Http\Request $swooleRequest, \Swoole\Http\Response $swooleResponse) {
             try {
+                // 将Swoole请求转换为应用Request对象
+                $request = Request::createFromSwoole($swooleRequest);
+                $request->setContainer(Container::getInstance());
+
+                // 记录请求开始
+                $this->logger->debug('Request received', [
+                    'method' => $request->getMethod(),
+                    'path' => $request->getPath(),
+                    'remote_address' => $swooleRequest->server['remote_addr']
+                ]);
+
                 // 路由匹配
                 $route = $this->router->match($request);
 
                 // 执行路由处理器（包含中间件）
                 $handlerResponse = $route->handle($request);
 
+                // 记录请求处理完成
                 $this->logger->info('Request handled', [
                     'method' => $request->getMethod(),
                     'path' => $request->getPath(),
                     'status_code' => $handlerResponse->getStatusCode()
                 ]);
 
-                // 立即发送响应
-                fwrite($conn, $handlerResponse->__toString());
-                fflush($conn);
+                // 设置响应头
+                foreach ($handlerResponse->getHeaders() as $name => $value) {
+                    $swooleResponse->header($name, $value);
+                }
+
+                // 设置状态码和响应内容
+                $swooleResponse->status($handlerResponse->getStatusCode());
+                $swooleResponse->end($handlerResponse->getBody());
             } catch (\Exception $e) {
                 // 错误处理
                 $statusCode = is_int($e->getCode()) && $e->getCode() >= 400 ? $e->getCode() : 500;
@@ -93,13 +77,12 @@ class ApiServer
                     'error' => $e->getMessage(),
                     'code' => $statusCode
                 ], $statusCode);
-                fwrite($conn, $errorResponse->__toString());
-                fflush($conn);
+
+                $swooleResponse->status($statusCode);
+                $swooleResponse->end($errorResponse->getBody());
             }
+        });
 
-            fclose($conn);
-        }
-
-        fclose($socket);
+        $http->start();
     }
 }
