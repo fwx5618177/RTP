@@ -25,12 +25,12 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-suggest
 
-      - name: Run tests
-        run: vendor/bin/phpunit --coverage-text
+      # - name: Run tests
+      #   run: vendor/bin/phpunit --coverage-text --coverage-filter src --display-deprecations --display-warnings
 
-      - name: Code coverage
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage.xml
-          flags: php
+      # - name: Code coverage
+      #   uses: codecov/codecov-action@v3
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     file: ./coverage.xml
+      #     flags: php

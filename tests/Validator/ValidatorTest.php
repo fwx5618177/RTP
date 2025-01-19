@@ -4,6 +4,7 @@ namespace Tests\Validator;
 
 use App\Exceptions\ValidationException;
 use App\Validator\Validator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class ValidatorTest extends TestCase
@@ -15,20 +16,14 @@ class ValidatorTest extends TestCase
         $this->validator = new Validator();
     }
 
-    /**
-     * @test
-     * @dataProvider validDataProvider
-     */
+    #[DataProvider('validDataProvider')]
     public function testValidDataPasses(array $data, array $rules): void
     {
         $result = $this->validator->validate($data, $rules);
         $this->assertTrue($result);
     }
 
-    /**
-     * @test
-     * @dataProvider invalidDataProvider
-     */
+    #[DataProvider('invalidDataProvider')]
     public function testInvalidDataThrowsException(array $data, array $rules, string $expectedMessage): void
     {
         $this->expectException(ValidationException::class);
@@ -37,14 +32,11 @@ class ValidatorTest extends TestCase
         $this->validator->validate($data, $rules);
     }
 
-    /**
-     * @test
-     */
     public function testCustomValidationRule(): void
     {
         $this->validator->addValidationRule(
             'phone',
-            fn ($value) => preg_match('/^1[3-9]\d{9}$/', $value),
+            fn($value) => preg_match('/^1[3-9]\d{9}$/', $value),
             'The {field} must be a valid phone number'
         );
 
@@ -157,15 +149,12 @@ class ValidatorTest extends TestCase
         ];
     }
 
-    /**
-     * @test
-     */
     public function testAddingAndUsingCustomRule(): void
     {
         // 添加自定义验证规则
         $this->validator->addValidationRule(
             'startsWith',
-            fn ($value, $params) => str_starts_with($value, $params[0]),
+            fn($value, $params) => str_starts_with($value, $params[0]),
             'The {field} must start with {param}'
         );
 
@@ -181,22 +170,19 @@ class ValidatorTest extends TestCase
         $this->validator->validate($invalidData, ['username' => 'startsWith:admin']);
     }
 
-    /**
-     * @test
-     */
     public function testMultipleCustomRules(): void
     {
         // 添加手机号验证规则
         $this->validator->addValidationRule(
             'phone',
-            fn ($value) => preg_match('/^1[3-9]\d{9}$/', $value),
+            fn($value) => preg_match('/^1[3-9]\d{9}$/', $value),
             'The {field} must be a valid phone number'
         );
 
         // 添加邮编验证规则
         $this->validator->addValidationRule(
             'postcode',
-            fn ($value) => preg_match('/^\d{6}$/', $value),
+            fn($value) => preg_match('/^\d{6}$/', $value),
             'The {field} must be a valid post code'
         );
 
@@ -222,14 +208,11 @@ class ValidatorTest extends TestCase
         $this->validator->validate($invalidData, $rules);
     }
 
-    /**
-     * @test
-     */
     public function testCombinedCustomAndStandardRules(): void
     {
         $this->validator->addValidationRule(
             'url',
-            fn ($value) => filter_var($value, FILTER_VALIDATE_URL),
+            fn($value) => filter_var($value, FILTER_VALIDATE_URL),
             'The {field} must be a valid URL'
         );
 
