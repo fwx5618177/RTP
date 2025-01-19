@@ -21,24 +21,18 @@ class UserController extends BaseController
 
     public function index(Request $request): Response
     {
-        // 临时返回测试数据
+        // 获取用户列表的实现
         return $this->successResponse([
             'message' => 'User list endpoint',
-            'status' => 'success'
         ]);
     }
 
     public function create(Request $request): Response
     {
         try {
-            // 1. 请求验证和转换为 DTO
             $userDTO = UserDTO::fromRequest($request);
-
-            // 2. 调用 Service 处理业务逻辑
             $user = $this->userService->createUser($userDTO);
-
-            // 3. 转换响应
-            return $this->successResponse(UserDTO::fromEntity($user));
+            return $this->successResponse(UserDTO::fromEntity($user)->toArray());
         } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -46,53 +40,39 @@ class UserController extends BaseController
 
     public function get(Request $request, int $id): Response
     {
-        $user = $this->userService->getUserById($id);
-
-        if (!$user) {
-            return new Response([
-                'error' => 'User not found'
-            ], 404);
+        try {
+            $user = $this->userService->getUserById($id);
+            if (!$user) {
+                return $this->errorResponse('User not found', 404);
+            }
+            return $this->successResponse(UserDTO::fromEntity($user)->toArray());
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
         }
-
-        return new Response([
-            'id' => $user->id,
-            'username' => $user->username,
-            'email' => $user->email,
-            'createdAt' => $user->createdAt->format('Y-m-d H:i:s')
-        ], 200);
     }
 
     public function update(Request $request, int $id): Response
     {
-        $data = $request->getBodyParams();
-
         try {
-            $userDTO = new UserDTO(
-                $id,
-                $data['username'],
-                $data['email'],
-                password_hash($data['password'], PASSWORD_DEFAULT),
-                new \DateTimeImmutable()
-            );
-
-            $updatedUser = $this->userService->updateUser($userDTO);
-
-            return new Response(200, ['Content-Type' => 'application/json'], [
-                'id' => $updatedUser->id,
-                'username' => $updatedUser->username,
-                'email' => $updatedUser->email,
-                'createdAt' => $updatedUser->createdAt->format('Y-m-d H:i:s')
-            ]);
+            $data = $request->getBodyParams();
+            $userDTO = UserDTO::fromArray(array_merge($data, ['id' => $id]));
+            $user = $this->userService->updateUser($userDTO);
+            return $this->successResponse(UserDTO::fromEntity($user)->toArray());
         } catch (ValidationException $e) {
-            return new Response(400, ['Content-Type' => 'application/json'], [
-                'error' => $e->getMessage()
-            ]);
+            return $this->errorResponse($e->getMessage(), 422);
         }
     }
 
     public function delete(Request $request, int $id): Response
     {
-        $this->userService->deleteUser($id);
-        return new Response(204);
+        try {
+            $this->userService->deleteUser($id);
+            return $this->successResponse([
+                'message' => 'User deleted successfully',
+                'user' => [],
+            ], 204);
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
     }
 }

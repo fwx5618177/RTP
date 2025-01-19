@@ -3,7 +3,8 @@
 /.vscode
 /.DS_Store
 /composer.lock
-/phpunit.xml
 /logs/
 
 .env
+
+.phpunit.result.cache

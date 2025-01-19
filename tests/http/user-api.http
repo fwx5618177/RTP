@@ -1,0 +1,61 @@
+### 用户注册
+# @name registerUser
+POST {{host}}/api/users
+Content-Type: application/json
+
+{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123",
+    "firstName": "Test",
+    "lastName": "User"
+}
+
+> {%
+    client.test("Register user success", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.success === true, "Response is not successful");
+        client.assert(response.body.data.email === "test@example.com", "Email does not match");
+    });
+%}
+
+### 获取用户信息
+# @name getUser
+GET {{host}}/api/users/1
+Authorization: Bearer {{authToken}}
+
+> {%
+    client.test("Get user success", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.data.id === 1, "User ID does not match");
+    });
+%}
+
+### 更新用户信息
+# @name updateUser
+PUT {{host}}/api/users/1
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+    "firstName": "Updated",
+    "lastName": "Name"
+}
+
+> {%
+    client.test("Update user success", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.data.firstName === "Updated", "First name not updated");
+    });
+%}
+
+### 删除用户
+# @name deleteUser
+DELETE {{host}}/api/users/1
+Authorization: Bearer {{authToken}}
+
+> {%
+    client.test("Delete user success", function() {
+        client.assert(response.status === 204, "Response status is not 204");
+    });
+%} 

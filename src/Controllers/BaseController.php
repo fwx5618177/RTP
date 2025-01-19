@@ -19,13 +19,13 @@ abstract class BaseController
 
     protected function successResponse($data, int $statusCode = 200): Response
     {
-        return (new Response(['success' => true, 'data' => $data], $statusCode))
+        return (new Response(['success' => true, 'data' => $data, 'code' => 200, 'time' => time()], $statusCode))
             ->header('Content-Type', 'application/json');
     }
 
     protected function errorResponse(string $message, int $statusCode = 400): Response
     {
-        return (new Response(['success' => false, 'error' => $message], $statusCode))
+        return (new Response(['success' => false, 'error' => $message, 'code' => 9999, 'time' => time()], $statusCode))
             ->header('Content-Type', 'application/json');
     }
 }
