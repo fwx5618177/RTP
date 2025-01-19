@@ -16,46 +16,153 @@ Content-Type: application/json
         client.assert(response.status === 200, "Response status is not 200");
         client.assert(response.body.success === true, "Response is not successful");
         client.assert(response.body.data.email === "test@example.com", "Email does not match");
+        client.assert(response.body.data.username === "testuser", "Username does not match");
+        // 保存用户ID供后续测试使用
+        client.global.set("userId", response.body.data.id);
     });
 %}
 
-### 获取用户信息
+### 用户登录
+# @name loginUser
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+    "email": "test@example.com",
+    "password": "password123"
+}
+
+> {%
+    client.test("Login user success", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.success === true, "Response is not successful");
+        client.assert(response.body.data.token !== undefined, "Token not returned");
+        // 保存token供后续测试使用
+        client.global.set("authToken", response.body.data.token);
+    });
+%}
+
+### 获取用户列表
+# @name listUsers
+GET {{host}}/api/users?page=1&limit=10
+Authorization: Bearer {{authToken}}
+
+> {%
+    client.test("List users success", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.success === true, "Response is not successful");
+        client.assert(Array.isArray(response.body.data.users), "Users array not returned");
+        client.assert(response.body.data.total >= 1, "Total count incorrect");
+    });
+%}
+
+### 获取单个用户信息
 # @name getUser
-GET {{host}}/api/users/1
+GET {{host}}/api/users/{{userId}}
 Authorization: Bearer {{authToken}}
 
 > {%
     client.test("Get user success", function() {
         client.assert(response.status === 200, "Response status is not 200");
-        client.assert(response.body.data.id === 1, "User ID does not match");
+        client.assert(response.body.success === true, "Response is not successful");
+        client.assert(response.body.data.email === "test@example.com", "Email does not match");
+        client.assert(response.body.data.username === "testuser", "Username does not match");
+    });
+%}
+
+### 获取用户个人资料
+# @name getUserProfile
+GET {{host}}/api/users/{{userId}}/profile
+Authorization: Bearer {{authToken}}
+
+> {%
+    client.test("Get user profile success", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.success === true, "Response is not successful");
+        client.assert(response.body.data.fullName === "Test User", "Full name does not match");
     });
 %}
 
 ### 更新用户信息
 # @name updateUser
-PUT {{host}}/api/users/1
+PUT {{host}}/api/users/{{userId}}
 Content-Type: application/json
 Authorization: Bearer {{authToken}}
 
 {
     "firstName": "Updated",
-    "lastName": "Name"
+    "lastName": "Name",
+    "email": "updated@example.com"
 }
 
 > {%
     client.test("Update user success", function() {
         client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.success === true, "Response is not successful");
+        client.assert(response.body.data.email === "updated@example.com", "Email not updated");
         client.assert(response.body.data.firstName === "Updated", "First name not updated");
+        client.assert(response.body.data.lastName === "Name", "Last name not updated");
+    });
+%}
+
+### 更新密码
+# @name updatePassword
+PUT {{host}}/api/users/{{userId}}/password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+    "currentPassword": "password123",
+    "newPassword": "newpassword123",
+    "confirmPassword": "newpassword123"
+}
+
+> {%
+    client.test("Update password success", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.success === true, "Response is not successful");
+    });
+%}
+
+### 测试无效的用户注册
+# @name registerInvalidUser
+POST {{host}}/api/users
+Content-Type: application/json
+
+{
+    "username": "",
+    "email": "invalid-email",
+    "password": "123"
+}
+
+> {%
+    client.test("Register invalid user fails", function() {
+        client.assert(response.status === 422, "Response status is not 422");
+        client.assert(response.body.success === false, "Response should not be successful");
+        client.assert(response.body.error !== undefined, "Error message not returned");
     });
 %}
 
 ### 删除用户
 # @name deleteUser
-DELETE {{host}}/api/users/1
+DELETE {{host}}/api/users/{{userId}}
 Authorization: Bearer {{authToken}}
 
 > {%
     client.test("Delete user success", function() {
         client.assert(response.status === 204, "Response status is not 204");
+    });
+%}
+
+### 验证用户已删除
+# @name verifyUserDeleted
+GET {{host}}/api/users/{{userId}}
+Authorization: Bearer {{authToken}}
+
+> {%
+    client.test("Verify user deleted", function() {
+        client.assert(response.status === 404, "Response status is not 404");
+        client.assert(response.body.success === false, "Response should not be successful");
+        client.assert(response.body.error === "User not found", "Incorrect error message");
     });
 %} 
