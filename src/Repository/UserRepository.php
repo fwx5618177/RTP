@@ -4,12 +4,12 @@ namespace App\Repository;
 
 use App\Entity\UserEntity;
 use Doctrine\ORM\EntityRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\QueryBuilder;
 
 class UserRepository extends EntityRepository
 {
-    public function __construct(EntityManagerInterface $em)
+    public function __construct(EntityManager $em)
     {
         parent::__construct($em, $em->getClassMetadata(UserEntity::class));
     }
@@ -60,21 +60,33 @@ class UserRepository extends EntityRepository
             ->getResult();
     }
 
-    public function searchUsers(array $criteria, array $orderBy = null, int $limit = null, int $offset = null): array
-    {
+    public function searchUsers(
+        array $criteria = [],
+        ?array $orderBy = null,
+        ?int $limit = null,
+        ?int $offset = null
+    ): array {
         $qb = $this->createQueryBuilder('u');
-        $this->applyCriteria($qb, $criteria);
 
+        // 添加搜索条件
+        foreach ($criteria as $field => $value) {
+            if ($value !== null) {
+                $qb->andWhere("u.$field LIKE :$field")
+                    ->setParameter($field, "%$value%");
+            }
+        }
+
+        // 添加排序
         if ($orderBy) {
             foreach ($orderBy as $field => $direction) {
                 $qb->addOrderBy("u.$field", $direction);
             }
         }
 
+        // 添加分页
         if ($limit) {
             $qb->setMaxResults($limit);
         }
-
         if ($offset) {
             $qb->setFirstResult($offset);
         }
@@ -170,5 +182,16 @@ class UserRepository extends EntityRepository
             ->setParameter('date', $date)
             ->getQuery()
             ->execute();
+    }
+
+    public function findAll(int $page = 1, int $limit = 10): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        return $this->createQueryBuilder('u')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
     }
 }
