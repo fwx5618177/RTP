@@ -77,11 +77,17 @@
   - **Server/**: 服务器相关配置
 - **tests/**: 单元测试和功能测试代码
 
-## 代码格式化
+## 代码检查与格式化
 
-项目使用 PHP_CodeSniffer 和 PHP-CS-Fixer 来保持代码风格一致。
+项目使用以下工具来保持代码质量和风格一致：
 
-### 安装
+- **PHP_CodeSniffer**: 检查代码风格并检测常见错误
+- **PHP-CS-Fixer**: 自动修复代码风格问题
+- **PHPUnit**: 单元测试框架，用于功能测试和错误检测
+
+注意：这些工具主要用于代码风格检查和格式化，虽然可以发现一些语法错误，但不能替代专业的静态代码分析工具。
+
+### 工具安装
 
 ```bash
 composer require --dev squizlabs/php_codesniffer friendsofphp/php-cs-fixer
