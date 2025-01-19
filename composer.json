@@ -5,11 +5,13 @@
     "require": {
         "php": "^8.0",
         "ext-swoole": "*",
+        "aws/aws-sdk-php": "^3.337",
         "doctrine/migrations": "^3.8",
         "doctrine/orm": "^3.3",
         "monolog/monolog": "^2.0",
         "php-di/php-di": "^7.0",
         "ramsey/uuid": "^4.7",
+        "swiftmailer/swiftmailer": "^5.4",
         "symfony/cache": "^7.2",
         "vlucas/phpdotenv": "^5.6"
     },

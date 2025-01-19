@@ -26,8 +26,7 @@ class LogRotateService
         int $maxFiles = 10,
         int $retentionDays = 30,
         array $mailConfig = []
-    )
-    {
+    ) {
         $this->logDir = rtrim($logDir, '/');
         $this->logFile = $logFile;
         $this->maxSize = $maxSize;
@@ -103,7 +102,7 @@ class LogRotateService
 
         // 按时间清理
         $now = time();
-        $files = array_filter($files, function($file) use ($now) {
+        $files = array_filter($files, function ($file) use ($now) {
             return ($now - filemtime($file)) < ($this->retentionDays * 86400);
         });
 
@@ -160,8 +159,8 @@ EOL;
     public function notify(string $message): void
     {
         // 根据级别记录日志
-        $this->logger->log($level, $message);
-        
+        $this->logger->log(\Monolog\Logger::INFO, $message);
+
         // 发送系统通知
         if (function_exists('syslog')) {
             syslog(LOG_NOTICE, $message);
@@ -180,7 +179,7 @@ EOL;
     private function sendMailNotification(string $message): void
     {
         $subject = "Log Rotation Notification";
-        
+
         // 使用内置mail函数
         if ($this->mailConfig['driver'] === 'mail' && function_exists('mail')) {
             if (!mail(
@@ -198,12 +197,17 @@ EOL;
 
         // 使用SMTP
         if ($this->mailConfig['driver'] === 'smtp') {
+            if (!class_exists('\Swift_SmtpTransport')) {
+                $this->logger->error("SwiftMailer not installed. Please run: composer require swiftmailer/swiftmailer");
+                throw new MailNotificationException("SwiftMailer not installed");
+            }
+
             $transport = (new \Swift_SmtpTransport(
                 $this->mailConfig['host'],
                 $this->mailConfig['port']
             ))
-            ->setUsername($this->mailConfig['username'])
-            ->setPassword($this->mailConfig['password']);
+                ->setUsername($this->mailConfig['username'])
+                ->setPassword($this->mailConfig['password']);
 
             $mailer = new \Swift_Mailer($transport);
             $swiftMessage = (new \Swift_Message($subject))
@@ -221,18 +225,23 @@ EOL;
             }
         }
 
-        // 使用第三方服务
-        if ($this->mailConfig['driver'] === 'ses' && class_exists('Aws\Ses\SesClient')) {
-            $client = new \Aws\Ses\SesClient([
-                'version' => 'latest',
-                'region'  => $this->mailConfig['region'],
-                'credentials' => [
-                    'key'    => $this->mailConfig['key'],
-                    'secret' => $this->mailConfig['secret'],
-                ],
-            ]);
+        // 使用AWS SES
+        if ($this->mailConfig['driver'] === 'ses') {
+            if (!class_exists('\Aws\Ses\SesClient')) {
+                $this->logger->error("AWS SDK not installed. Please run: composer require aws/aws-sdk-php");
+                throw new MailNotificationException("AWS SDK not installed");
+            }
 
             try {
+                $client = new \Aws\Ses\SesClient([
+                    'version' => 'latest',
+                    'region'  => $this->mailConfig['region'],
+                    'credentials' => [
+                        'key'    => $this->mailConfig['key'],
+                        'secret' => $this->mailConfig['secret'],
+                    ],
+                ]);
+
                 $client->sendEmail([
                     'Destination' => [
                         'ToAddresses' => $this->mailConfig['recipients'],
