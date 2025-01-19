@@ -47,8 +47,8 @@ POST http://localhost:9501/api/users
 Content-Type: application/json
 
 {
-    "username": "test_user",
-    "email": "test@example.com",
+    "username": "test_user1",
+    "email": "test@example1.com",
     "password": "password123"
 }
 
@@ -67,7 +67,7 @@ Content-Type: application/json
 }
 
 ### 10. 删除用户
-DELETE http://localhost:9501/api/users/1
+DELETE http://localhost:9501/api/users/2
 Content-Type: application/json
 
 ###############################################

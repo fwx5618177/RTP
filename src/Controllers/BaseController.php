@@ -25,7 +25,7 @@ abstract class BaseController
 
     protected function errorResponse(string $message, int $statusCode = 400): Response
     {
-        return (new Response(['success' => false, 'error' => $message, 'code' => 9999, 'time' => time()], $statusCode))
+        return (new Response(['success' => false, 'error' => $message, 'code' => 9999, 'time' => time(), 'data' => []], $statusCode))
             ->header('Content-Type', 'application/json');
     }
 }

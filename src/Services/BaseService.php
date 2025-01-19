@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Response;
 use App\Utils\Container;
 use Doctrine\ORM\EntityManager;
 use Psr\Container\ContainerInterface;

@@ -139,10 +139,10 @@ class UserDTO extends BaseDTO
             'roles' => $this->roles,
             'isActive' => $this->isActive,
             'fullName' => trim(($this->firstName ?? '') . ' ' . ($this->lastName ?? '')),
-            'createdAt' => $this->createdAt?->format('Y-m-d H:i:s'),
-            'updatedAt' => $this->updatedAt?->format('Y-m-d H:i:s'),
-            'lastLoginAt' => $this->lastLoginAt?->format('Y-m-d H:i:s'),
-            'deletedAt' => $this->deletedAt?->format('Y-m-d H:i:s')
+            'createdAt' => $this->createdAt,
+            'updatedAt' => $this->updatedAt,
+            'lastLoginAt' => $this->lastLoginAt,
+            'deletedAt' => $this->deletedAt
         ];
     }
 

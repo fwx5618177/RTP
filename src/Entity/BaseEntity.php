@@ -2,33 +2,32 @@
 
 namespace App\Entity;
 
+use App\Interfaces\ModelInterface;
 use App\Logs\Logger;
 use App\Utils\Container;
+use Doctrine\ORM\Mapping as ORM;
 
-abstract class BaseEntity
+#[ORM\MappedSuperclass]
+#[ORM\HasLifecycleCallbacks]
+abstract class BaseEntity implements ModelInterface
 {
-    protected Logger $logger;
+    protected ?Logger $logger = null;
 
     public function __construct()
     {
-        $this->logger = Container::getInstance()->get(Logger::class);
+        $this->initLogger();
     }
 
-    public function logOperation(string $operation): void
+    public function initLogger(): void
     {
-        $entityType = static::class;
-        $identifier = $this->id ?? 'new';
+        if ($this->logger === null) {
+            $this->logger = Container::getInstance()->get(Logger::class);
+        }
+    }
 
-        $context = [
-            'entity' => $entityType,
-            'identifier' => $identifier,
-            'operation' => $operation,
-            'timestamp' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-        ];
-
-        $this->logger->info(
-            sprintf('%s entity %s was %s', $entityType, $identifier, $operation),
-            $context
-        );
+    public function logOperation(string $operation, array $context = []): void
+    {
+        $this->initLogger();
+        $this->logger->info(sprintf('%s %s', get_class($this), $operation), $context);
     }
 }
