@@ -8,15 +8,18 @@ use App\DTO\UserDTO;
 use App\Services\UserService;
 use App\Exceptions\ValidationException;
 use Psr\Container\ContainerInterface;
+use App\Logs\Logger;
 
 class UserController extends BaseController
 {
     private UserService $userService;
+    private Logger $logger;
 
     public function __construct(ContainerInterface $container)
     {
         parent::__construct($container);
         $this->userService = $container->get(UserService::class);
+        $this->logger = Logger::getInstance('user-controller');
     }
 
     public function index(Request $request): Response
@@ -47,11 +50,45 @@ class UserController extends BaseController
     public function create(Request $request): Response
     {
         try {
-            $userDTO = UserDTO::fromRequest($request);
+            // 记录原始请求数据
+            $this->logger->info('Creating user - Raw request body', [
+                'method' => $request->getMethod(),
+                'headers' => $request->getHeaders(),
+                'body' => $request->getBodyParams(),
+                'query' => $request->getQueryParams()
+            ]);
+
+            // 获取请求体
+            $requestBody = json_decode(file_get_contents('php://input'), true) ?? [];
+
+            $this->logger->info('Parsed request body', ['data' => $requestBody]);
+
+            // 验证必填字段
+            if (empty($requestBody['username']) || empty($requestBody['email']) || empty($requestBody['password'])) {
+                $this->logger->error('Validation failed - Missing required fields', ['requestBody' => $requestBody]);
+                return $this->errorResponse('Missing required fields');
+            }
+
+            $userDTO = new UserDTO($requestBody['username'], $requestBody['email']);
+            $userDTO->password = $requestBody['password'];
+
+            $this->logger->info('Creating user with DTO', ['dto' => $userDTO->toArray()]);
+
             $user = $this->userService->createUser($userDTO);
-            return $this->successResponse(UserDTO::fromEntity($user)->toArray());
-        } catch (ValidationException $e) {
-            return $this->errorResponse($e->getMessage(), 422);
+
+            $this->logger->info('User created successfully', ['userId' => $user->getId()]);
+
+            return $this->successResponse([
+                'id' => $user->getId(),
+                'username' => $user->getUsername(),
+                'email' => $user->getEmail()
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Error creating user', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return $this->errorResponse($e->getMessage());
         }
     }
 

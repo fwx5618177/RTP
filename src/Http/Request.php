@@ -2,16 +2,29 @@
 
 namespace App\Http;
 
+use App\Logs\Logger;
+use App\Utils\Container;
+
 class Request
 {
+    public const METHOD_GET = 'GET';
+    public const METHOD_POST = 'POST';
+    public const METHOD_PUT = 'PUT';
+    public const METHOD_PATCH = 'PATCH';
+    public const METHOD_DELETE = 'DELETE';
+    public const METHOD_HEAD = 'HEAD';
+    public const METHOD_OPTIONS = 'OPTIONS';
+
     private string $method;
     private string $path;
-    private array $queryParams;
-    private array $bodyParams;
-    private array $headers;
-    private array $cookies;
-    private array $files;
+    private array $queryParams = [];
+    private array $bodyParams = [];
+    private array $headers = [];
+    private array $cookies = [];
+    private array $files = [];
+    private ?string $rawBody = null;
     private $container;
+    private Logger $logger;
 
     public function __construct(
         string $method,
@@ -20,15 +33,65 @@ class Request
         array $headers = [],
         array $cookies = [],
         array $files = [],
-        array $server = []
+        array $server = [],
+        ?string $rawBody = null
     ) {
+        $this->logger = Container::getInstance()->get(Logger::class);
         $this->method = strtoupper($method);
         $this->path = $path;
         $this->queryParams = $query;
-        $this->bodyParams = [];
-        $this->headers = array_merge($headers, $this->extractHeaders($server));
+        $this->headers = array_change_key_case(array_merge($headers, $this->extractHeaders($server)), CASE_LOWER);
         $this->cookies = $cookies;
         $this->files = $files;
+        $this->rawBody = $rawBody;
+
+        // 解析请求体
+        if ($this->rawBody) {
+            $this->bodyParams = $this->parseRequestBody();
+            $this->logger->debug('Parsed request body', [
+                'method' => $this->method,
+                'contentType' => $this->getHeader('content-type'),
+                'bodyParams' => $this->bodyParams
+            ]);
+        }
+    }
+
+    private function parseRequestBody(): array
+    {
+        if ($this->method === self::METHOD_GET || $this->method === self::METHOD_HEAD) {
+            return [];
+        }
+
+        $contentType = $this->getHeader('content-type') ?? '';
+
+        $this->logger->debug('Parsing request body', [
+            'contentType' => $contentType,
+            'rawBody' => $this->rawBody
+        ]);
+
+        if (empty($this->rawBody)) {
+            return [];
+        }
+
+        if (str_contains(strtolower($contentType), 'application/json')) {
+            $data = json_decode($this->rawBody, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->logger->error('JSON decode error', ['error' => json_last_error_msg()]);
+                return [];
+            }
+            return $data ?? [];
+        }
+
+        if (str_contains(strtolower($contentType), 'application/x-www-form-urlencoded')) {
+            parse_str($this->rawBody, $data);
+            return $data;
+        }
+
+        if (str_contains(strtolower($contentType), 'multipart/form-data')) {
+            return $_POST;
+        }
+
+        return [];
     }
 
     public static function createFromGlobals(): self
@@ -37,7 +100,7 @@ class Request
             $_SERVER['REQUEST_METHOD'] ?? 'GET',
             $_SERVER['REQUEST_URI'] ?? '/',
             $_GET,
-            [], // headers
+            getallheaders() ?: [],
             $_COOKIE,
             $_FILES,
             $_SERVER
@@ -84,82 +147,73 @@ class Request
             $headers, // headers
             [], // cookies
             [], // files
-            $server // server
+            $server, // server
+            $body // rawBody
         );
     }
 
     public static function createFromSwoole(\Swoole\Http\Request $swooleRequest): self
     {
-        // 解析请求路径和查询参数
         $uri = $swooleRequest->server['request_uri'];
         $queryString = $swooleRequest->server['query_string'] ?? '';
         parse_str($queryString, $queryParams);
 
-        // 转换headers
         $headers = [];
         foreach ($swooleRequest->header as $name => $value) {
             $headers[$name] = $value;
         }
 
-        // 转换cookies
-        $cookies = $swooleRequest->cookie ?? [];
-
-        // 转换files
-        $files = [];
-        if (!empty($swooleRequest->files)) {
-            foreach ($swooleRequest->files as $field => $file) {
-                $files[$field] = [
-                    'name' => $file['name'],
-                    'type' => $file['type'],
-                    'tmp_name' => $file['tmp_name'],
-                    'error' => $file['error'],
-                    'size' => $file['size']
-                ];
-            }
-        }
-
-        // 转换server变量
-        $server = [];
-        foreach ($swooleRequest->server as $key => $value) {
-            $server[strtoupper($key)] = $value;
-        }
-
-        return new self(
+        $request = new self(
             $swooleRequest->server['request_method'],
             $uri,
             $queryParams,
             $headers,
-            $cookies,
-            $files,
-            $server
+            $swooleRequest->cookie ?? [],
+            $swooleRequest->files ?? [],
+            $swooleRequest->server,
+            $swooleRequest->rawContent()  // 传入原始请求体
         );
+
+        return $request;
     }
 
-    private function extractHeaders(array $server): array
+    // HTTP 方法判断
+    public function isGet(): bool
     {
-        $headers = [];
-        foreach ($server as $key => $value) {
-            if (str_starts_with($key, 'HTTP_')) {
-                // 处理标准HTTP头
-                $headers[str_replace('_', '-', substr($key, 5))] = $value;
-            } elseif (in_array($key, [
-                'CONTENT_TYPE',
-                'CONTENT_LENGTH',
-                'CONTENT_MD5',
-            ])) {
-                // 处理特殊内容头
-                $headers[str_replace('_', '-', $key)] = $value;
-            }
-        }
-
-        // 从apache_request_headers()获取完整header（如果可用）
-        if (function_exists('apache_request_headers')) {
-            $headers = array_merge($headers, apache_request_headers());
-        }
-
-        return $headers;
+        return $this->method === self::METHOD_GET;
     }
 
+    public function isPost(): bool
+    {
+        return $this->method === self::METHOD_POST;
+    }
+
+    public function isPut(): bool
+    {
+        return $this->method === self::METHOD_PUT;
+    }
+
+    public function isPatch(): bool
+    {
+        return $this->method === self::METHOD_PATCH;
+    }
+
+    public function isDelete(): bool
+    {
+        return $this->method === self::METHOD_DELETE;
+    }
+
+    public function isHead(): bool
+    {
+        return $this->method === self::METHOD_HEAD;
+    }
+
+    public function isOptions(): bool
+    {
+        return $this->method === self::METHOD_OPTIONS;
+    }
+
+    // Getters
     public function getMethod(): string
     {
         return $this->method;
@@ -185,13 +239,9 @@ class Request
         return $this->headers;
     }
 
-    public function header(string $name): ?string
-    {
-        return $this->headers[$name] ?? null;
-    }
-
     public function getHeader(string $name): ?string
     {
+        $name = strtolower($name);
         return $this->headers[$name] ?? null;
     }
 
@@ -203,6 +253,46 @@ class Request
     public function getFiles(): array
     {
         return $this->files;
+    }
+
+    public function input(string $key, $default = null)
+    {
+        return $this->bodyParams[$key] ?? $this->queryParams[$key] ?? $default;
+    }
+
+    public function all(): array
+    {
+        return array_merge($this->queryParams, $this->bodyParams);
+    }
+
+    public function only(array $keys): array
+    {
+        return array_intersect_key($this->all(), array_flip($keys));
+    }
+
+    public function except(array $keys): array
+    {
+        return array_diff_key($this->all(), array_flip($keys));
+    }
+
+    public function has(string $key): bool
+    {
+        return isset($this->bodyParams[$key]) || isset($this->queryParams[$key]);
+    }
+
+    private function extractHeaders(array $server): array
+    {
+        $headers = [];
+        foreach ($server as $key => $value) {
+            if (str_starts_with($key, 'HTTP_')) {
+                $name = str_replace('_', '-', substr($key, 5));
+                $headers[$name] = $value;
+            } elseif (in_array($key, ['CONTENT_TYPE', 'CONTENT_LENGTH', 'CONTENT_MD5'])) {
+                $name = str_replace('_', '-', $key);
+                $headers[$name] = $value;
+            }
+        }
+        return $headers;
     }
 
     public function setContainer($container): void

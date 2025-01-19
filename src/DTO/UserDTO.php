@@ -274,7 +274,7 @@ class UserDTO extends BaseDTO
 
     public function getPasswordHash(): ?string
     {
-        return $this->passwordHash;
+        return $this->password;
     }
 
     public function getFirstName(): ?string
