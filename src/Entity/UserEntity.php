@@ -6,6 +6,7 @@ use App\Repository\UserRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
+use DateTime;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'users')]
@@ -26,35 +27,47 @@ class UserEntity extends BaseEntity
     #[ORM\Column(type: 'string', length: 255, unique: true)]
     private string $email;
 
-    #[ORM\Column(type: 'string', length: 255)]
+    #[ORM\Column(name: 'password', type: 'string', length: 255)]
     private string $passwordHash;
 
-    #[ORM\Column(type: 'string', length: 50, nullable: true)]
+    #[ORM\Column(name: 'first_name', type: 'string', length: 100, nullable: true)]
     private ?string $firstName = null;
 
-    #[ORM\Column(type: 'string', length: 50, nullable: true)]
+    #[ORM\Column(name: 'last_name', type: 'string', length: 100, nullable: true)]
     private ?string $lastName = null;
 
-    #[ORM\Column(type: 'string', length: 20, nullable: true)]
+    #[ORM\Column(name: 'phone', type: 'string', length: 20, nullable: true)]
     private ?string $phone = null;
 
-    #[ORM\Column(type: 'json')]
-    private array $roles = ['ROLE_USER'];
+    #[ORM\Column(name: 'address', type: 'text', nullable: true)]
+    private ?string $address = null;
 
-    #[ORM\Column(type: 'boolean')]
+    #[ORM\Column(name: 'avatar_url', type: 'string', length: 255, nullable: true)]
+    private ?string $avatarUrl = null;
+
+    #[ORM\Column(name: 'role', type: 'string', length: 20)]
+    private string $role = 'user';
+
+    #[ORM\Column(name: 'is_active', type: 'boolean')]
     private bool $isActive = true;
 
-    #[ORM\Column(type: 'datetime_immutable')]
-    private \DateTimeImmutable $createdAt;
+    #[ORM\Column(name: 'last_login_at', type: 'datetime', nullable: true)]
+    private ?DateTime $lastLoginAt = null;
 
-    #[ORM\Column(type: 'datetime_immutable')]
-    private \DateTimeImmutable $updatedAt;
+    #[ORM\Column(name: 'email_verified_at', type: 'datetime', nullable: true)]
+    private ?DateTime $emailVerifiedAt = null;
 
-    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    private ?\DateTimeImmutable $lastLoginAt = null;
+    #[ORM\Column(name: 'created_at', type: 'datetime')]
+    private DateTime $createdAt;
 
-    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[ORM\Column(name: 'updated_at', type: 'datetime')]
+    private DateTime $updatedAt;
+
+    #[ORM\Column(name: 'deleted_at', type: 'datetime', nullable: true)]
     private ?\DateTimeImmutable $deletedAt = null;
+
+    #[ORM\Column(name: 'roles', type: 'json')]
+    private array $roles = ['user'];
 
     public function __construct(
         string $username,
@@ -67,8 +80,9 @@ class UserEntity extends BaseEntity
         $this->username = $username;
         $this->email = $email;
         $this->passwordHash = $passwordHash;
-        $this->createdAt = new \DateTimeImmutable();
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->createdAt = new DateTime();
+        $this->updatedAt = new DateTime();
+        $this->roles = ['user'];  // 设置默认角色
 
         $this->logOperation('created');
     }
@@ -77,7 +91,7 @@ class UserEntity extends BaseEntity
     #[ORM\PreUpdate]
     public function onPreUpdate(): void
     {
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->updatedAt = new DateTime();
         $this->logOperation('updated');
     }
 
@@ -208,14 +222,36 @@ class UserEntity extends BaseEntity
         return $this;
     }
 
-    public function getRoles(): array
+    public function getAddress(): ?string
     {
-        return $this->roles;
+        return $this->address;
     }
 
-    public function setRoles(array $roles): self
+    public function setAddress(?string $address): self
     {
-        $this->roles = $roles;
+        $this->address = $address;
+        return $this;
+    }
+
+    public function getAvatarUrl(): ?string
+    {
+        return $this->avatarUrl;
+    }
+
+    public function setAvatarUrl(?string $avatarUrl): self
+    {
+        $this->avatarUrl = $avatarUrl;
+        return $this;
+    }
+
+    public function getRole(): string
+    {
+        return $this->role;
+    }
+
+    public function setRole(string $role): self
+    {
+        $this->role = $role;
         return $this;
     }
 
@@ -230,25 +266,36 @@ class UserEntity extends BaseEntity
         return $this;
     }
 
-    public function getCreatedAt(): \DateTimeImmutable
+    public function getCreatedAt(): DateTime
     {
         return $this->createdAt;
     }
 
-    public function getUpdatedAt(): \DateTimeImmutable
+    public function getUpdatedAt(): DateTime
     {
         return $this->updatedAt;
     }
 
-    public function getLastLoginAt(): ?\DateTimeImmutable
+    public function getLastLoginAt(): ?DateTime
     {
         return $this->lastLoginAt;
     }
 
-    public function setLastLoginAt(\DateTimeImmutable $lastLoginAt): self
+    public function setLastLoginAt(?DateTime $lastLoginAt): self
     {
         $this->lastLoginAt = $lastLoginAt;
         $this->logOperation('logged_in');
+        return $this;
+    }
+
+    public function getEmailVerifiedAt(): ?DateTime
+    {
+        return $this->emailVerifiedAt;
+    }
+
+    public function setEmailVerifiedAt(?DateTime $emailVerifiedAt): self
+    {
+        $this->emailVerifiedAt = $emailVerifiedAt;
         return $this;
     }
 
@@ -276,6 +323,17 @@ class UserEntity extends BaseEntity
         return trim(($this->firstName ?? '') . ' ' . ($this->lastName ?? ''));
     }
 
+    public function getRoles(): array
+    {
+        return $this->roles;
+    }
+
+    public function setRoles(array $roles): self
+    {
+        $this->roles = $roles;
+        return $this;
+    }
+
     public function hasRole(string $role): bool
     {
         return in_array($role, $this->roles, true);
@@ -298,5 +356,10 @@ class UserEntity extends BaseEntity
             $this->logOperation("role_removed:$role");
         }
         return $this;
+    }
+
+    public function updateTimestamp(): void
+    {
+        $this->updatedAt = new DateTime();
     }
 }

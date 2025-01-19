@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use Doctrine\ORM\ORMSetup;
 use Doctrine\ORM\EntityManager;
+use Doctrine\DBAL\Types\Type;
+use Ramsey\Uuid\Doctrine\UuidType;
 
 class DatabaseServiceProvider
 {
@@ -12,6 +14,11 @@ class DatabaseServiceProvider
     public static function getEntityManager(): EntityManager
     {
         if (self::$entityManager === null) {
+            // 注册 UUID 类型
+            if (!Type::hasType('uuid')) {
+                Type::addType('uuid', UuidType::class);
+            }
+
             $config = ORMSetup::createAttributeMetadataConfiguration(
                 paths: [__DIR__ . '/../../src'],
                 isDevMode: true,
@@ -30,6 +37,10 @@ class DatabaseServiceProvider
             ]);
 
             self::$entityManager = new EntityManager($conn, $config);
+
+            // 注册 UUID 类型到数据库平台
+            $platform = $conn->getDatabasePlatform();
+            $platform->registerDoctrineTypeMapping('uuid', 'uuid');
         }
 
         return self::$entityManager;
