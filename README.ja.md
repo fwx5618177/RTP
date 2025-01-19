@@ -1,19 +1,15 @@
+<div align="center">
 <h1 align="center">RTP</h1>
 
-<p align="center">
-  <a href="https://github.com/fwx5618177/rtp/actions/workflows/ci.yml">
-    <img src="https://github.com/fwx5618177/rtp/actions/workflows/ci.yml/badge.svg" alt="CI Status">
-  </a>
-  <a href="https://codecov.io/gh/fwx5618177/rtp">
-    <img src="https://codecov.io/gh/fwx5618177/rtp/branch/main/graph/badge.svg" alt="Code Coverage">
-  </a>
-  <a href="https://packagist.org/packages/fwx5618177/rtp">
-    <img src="https://img.shields.io/packagist/v/fwx5618177/rtp.svg" alt="Packagist Version">
-  </a>
-  <a href="https://packagist.org/packages/fwx5618177/rtp">
-    <img src="https://img.shields.io/packagist/l/fwx5618177/rtp.svg" alt="License">
-  </a>
-</p>
+[![GitHub stars](https://img.shields.io/github/stars/fwx5618177/RTP.svg?style=social&label=Stars)](https://github.com/fwx5618177/RTP)
+[![GitHub issues](https://img.shields.io/github/issues/fwx5618177/RTP.svg)](https://github.com/fwx5618177/RTP/issues)
+[![GitHub license](https://img.shields.io/github/license/fwx5618177/RTP.svg)](https://github.com/fwx5618177/RTP/blob/main/LICENSE)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/fwx5618177/RTP.svg)](https://github.com/fwx5618177/RTP/pulls)
+[![GitHub contributors](https://img.shields.io/github/contributors/fwx5618177/RTP.svg)](https://github.com/fwx5618177/RTP/graphs/contributors)
+
+[English](./README.md) | [简体中文](./README_ZH.md) | [日本語](./README_JP.md)
+
+</div>
 
 ## プロジェクト概要
 
