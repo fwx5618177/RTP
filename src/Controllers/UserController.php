@@ -21,10 +21,27 @@ class UserController extends BaseController
 
     public function index(Request $request): Response
     {
-        // 获取用户列表的实现
-        return $this->successResponse([
-            'message' => 'User list endpoint',
-        ]);
+        try {
+            $page = (int) ($request->getQueryParams()['page'] ?? 1);
+            $limit = (int) ($request->getQueryParams()['limit'] ?? 10);
+
+            $users = $this->userService->listUsers($page, $limit);
+            $total = $this->userService->countUsers();
+
+            $userDTOs = array_map(
+                fn($user) => UserDTO::fromEntity($user)->toArray(),
+                $users
+            );
+
+            return $this->successResponse([
+                'users' => $userDTOs,
+                'total' => $total,
+                'page' => $page,
+                'limit' => $limit
+            ]);
+        } catch (ValidationException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
     }
 
     public function create(Request $request): Response
@@ -54,10 +71,25 @@ class UserController extends BaseController
     public function update(Request $request, int $id): Response
     {
         try {
-            $data = $request->getBodyParams();
-            $userDTO = UserDTO::fromArray(array_merge($data, ['id' => $id]));
-            $user = $this->userService->updateUser($userDTO);
-            return $this->successResponse(UserDTO::fromEntity($user)->toArray());
+            $existingUser = $this->userService->getUserById($id);
+            if (!$existingUser) {
+                return $this->errorResponse('User not found', 404);
+            }
+
+            // 从请求创建 DTO，并保留现有用户的一些数据
+            $data = array_merge(
+                UserDTO::fromEntity($existingUser)->toArray(),
+                $request->getBodyParams()
+            );
+            $data['id'] = $id; // 确保 ID 正确
+
+            $userDTO = UserDTO::fromArray($data);
+
+            // 更新现有实体
+            $updatedUser = $userDTO->updateEntity($existingUser);
+            $this->userService->updateUser($updatedUser);
+
+            return $this->successResponse(UserDTO::fromEntity($updatedUser)->toArray());
         } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -66,10 +98,14 @@ class UserController extends BaseController
     public function delete(Request $request, int $id): Response
     {
         try {
+            $user = $this->userService->getUserById($id);
+            if (!$user) {
+                return $this->errorResponse('User not found', 404);
+            }
+
             $this->userService->deleteUser($id);
             return $this->successResponse([
-                'message' => 'User deleted successfully',
-                'user' => [],
+                'message' => 'User deleted successfully'
             ], 204);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422);
