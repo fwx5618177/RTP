@@ -1,46 +1,33 @@
-# 贡献者行为准则
+# Contributor Covenant Code of Conduct
 
-## 我们的承诺
+## Our Pledge
 
-为了营造一个开放、友好的环境，我们作为贡献者和维护者承诺：无论年龄、体型、身体健全与否、民族、性征、性别认同与表达、经验水平、教育程度、社会地位、国籍、相貌、种族、宗教信仰、性取向，我们参与项目和社区的每一个人都不容忍任何形式的骚扰行为。
+In the interest of fostering an open and welcoming environment, we as contributors and maintainers pledge to making participation in our project and our community a harassment-free experience for everyone, regardless of age, body size, disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual orientation.
 
-## 我们的准则
+## Our Standards
 
-有助于为我们社区创造积极环境的行为包括但不限于：
+Examples of behavior that contributes to creating a positive environment include:
 
-- 使用欢迎和包容的语言
-- 尊重不同的观点和经验
-- 优雅地接受建设性批评
-- 关注对社区最有利的事情
-- 对其他社区成员表现出同理心
+- Using welcoming and inclusive language
+- Being respectful of differing viewpoints and experiences
+- Gracefully accepting constructive criticism
+- Focusing on what is best for the community
+- Showing empathy towards other community members
 
-参与者不可接受的行为包括但不限于：
+Examples of unacceptable behavior by participants include:
 
-- 使用与性有关的言语或是图像，以及不受欢迎的性关注
-- 捣乱/煽动/侮辱/贬损的评论，以及人身攻击或是政治攻击
-- 公开或私下的骚扰
-- 未经明确授权便发布他人的资料，如地址、电子邮箱等
-- 其他有理由认定为违反职业操守的不当行为
+- The use of sexualized language or imagery and unwelcome sexual attention
+- Trolling, insulting/derogatory comments, and personal or political attacks
+- Public or private harassment
+- Publishing others' private information, such as physical or electronic addresses, without explicit permission
+- Other conduct which could reasonably be considered inappropriate in a professional setting
 
-## 我们的责任
+## Our Responsibilities
 
-项目维护者有责任为可接受的行为标准作出诠释，以及对已发生的不当行为采取恰当且公平的纠正措施。
+Project maintainers are responsible for clarifying the standards of acceptable behavior and are expected to take appropriate and fair corrective action in response to any instances of unacceptable behavior.
 
-项目维护者有权利及责任去删除、编辑、拒绝违背本行为标准的评论（comments）、提交（commits）、代码、wiki 编辑、问题（issues）等贡献；若有必要，亦可暂时或永久地封禁任何他们认为行为不当、威胁、冒犯、有害的参与者。
+Project maintainers have the right and responsibility to remove, edit, or reject comments, commits, code, wiki edits, issues, and other contributions that are not aligned to this Code of Conduct, or to ban temporarily or permanently any contributor for other behaviors that they deem inappropriate, threatening, offensive, or harmful.
 
-## 适用范围
+## Scope
 
-本行为标准适用于本项目所有空间，也适用于项目维护者公开代表项目时的场合。代表项目的情形包括使用官方项目电子邮箱、通过官方社交媒体账号发布消息、作为指定代表参与在线或线下活动等。
-
-## 执行
-
-如发现滥用、骚扰或其他不可接受的行为，请通过 [fwx5618177@gmail.com](mailto:fwx5618177@gmail.com) 联系项目团队。所有投诉都将得到及时和公正的审查和调查。
-
-项目团队有义务对事件的举报者保密。
-
-## 归属
-
-本行为准则改编自 [贡献者契约][homepage]，版本 1.4，可在此查阅：
-https://www.contributor-covenant.org/version/1/4/code-of-conduct.html
-
-[homepage]: https://www.contributor-covenant.org
+This Code of Conduct applies both within project spaces and in public spaces when an individual is representing the project or its community. Examples of representing a project or community include

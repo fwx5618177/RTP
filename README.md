@@ -1,365 +1,365 @@
 <h1 align="center">RTP</h1>
 
 <p align="center">
-  <a href="https://github.com/yourusername/rtp-bridge-backend/actions/workflows/ci.yml">
-    <img src="https://github.com/yourusername/rtp-bridge-backend/actions/workflows/ci.yml/badge.svg" alt="CI Status">
+  <a href="https://github.com/fwx5618177/rtp/actions/workflows/ci.yml">
+    <img src="https://github.com/fwx5618177/rtp/actions/workflows/ci.yml/badge.svg" alt="CI Status">
   </a>
-  <a href="https://codecov.io/gh/yourusername/rtp-bridge-backend">
-    <img src="https://codecov.io/gh/yourusername/rtp-bridge-backend/branch/main/graph/badge.svg" alt="Code Coverage">
+  <a href="https://codecov.io/gh/fwx5618177/rtp">
+    <img src="https://codecov.io/gh/fwx5618177/rtp/branch/main/graph/badge.svg" alt="Code Coverage">
   </a>
-  <a href="https://packagist.org/packages/yourusername/rtp-bridge-backend">
-    <img src="https://img.shields.io/packagist/v/yourusername/rtp-bridge-backend.svg" alt="Packagist Version">
+  <a href="https://packagist.org/packages/fwx5618177/rtp">
+    <img src="https://img.shields.io/packagist/v/fwx5618177/rtp.svg" alt="Packagist Version">
   </a>
-  <a href="https://packagist.org/packages/yourusername/rtp-bridge-backend">
-    <img src="https://img.shields.io/packagist/l/yourusername/rtp-bridge-backend.svg" alt="License">
+  <a href="https://packagist.org/packages/fwx5618177/rtp">
+    <img src="https://img.shields.io/packagist/l/fwx5618177/rtp.svg" alt="License">
   </a>
 </p>
 
-## 项目介绍
+## Project Introduction
 
-RTP 是一个高性能的实时传输协议桥接后端，基于 PHP 和 Swoole 构建，旨在提供稳定、高效的实时数据传输服务。
+RTP is a high-performance real-time transport protocol bridge backend built on PHP and Swoole, designed to provide stable and efficient real-time data transmission services.
 
-## 语言选择
+## Language Selection
 
-本项目提供以下语言版本：
+This project is available in the following languages:
 
 - [English](README.md)
 - [简体中文](README.zh.md)
 - [日本語](README.ja.md)
 
-## 项目架构
+## Project Architecture
 
-本项目采用分层架构设计，主要流程如下：
+This project adopts a layered architecture design with the following main workflow:
 
-1. Client -> Route: 客户端请求首先进入路由层
-2. Route -> Middleware: 路由层根据请求路径匹配中间件
-3. Middleware -> Http: 中间件处理请求预处理
-4. Http -> Controller: HTTP 层解析请求并传递给控制器
-5. Controller -> DTO: 控制器将请求数据转换为 DTO 对象
-6. DTO -> Service: DTO 对象传递给业务服务层
-7. Service -> Entity: 业务服务层操作实体对象
-8. Entity -> Repository: 实体对象通过仓储层持久化
-9. Repository -> DB: 最终数据存储到数据库
+1. Client -> Route: Client requests first enter the routing layer
+2. Route -> Middleware: Routing layer matches middleware based on request path
+3. Middleware -> Http: Middleware handles request preprocessing
+4. Http -> Controller: HTTP layer parses requests and passes to controllers
+5. Controller -> DTO: Controllers convert request data to DTO objects
+6. DTO -> Service: DTO objects are passed to business service layer
+7. Service -> Entity: Business service layer operates on entity objects
+8. Entity -> Repository: Entity objects are persisted through repository layer
+9. Repository -> DB: Final data storage in database
 
-### 架构使用方法
+### Architecture Usage
 
-1. **路由定义**
+1. **Route Definition**
 
-   - 在 src/Routes/ 目录下定义路由
-   - 使用 Route 类注册路由
-   - 支持 GET/POST/PUT/DELETE 等 HTTP 方法
+   - Define routes in src/Routes/ directory
+   - Use Route class to register routes
+   - Support HTTP methods like GET/POST/PUT/DELETE
 
-2. **中间件使用**
+2. **Middleware Usage**
 
-   - 在 src/Middlewares/ 目录下创建中间件
-   - 实现 MiddlewareInterface 接口
-   - 在路由定义时通过 middleware() 方法添加
+   - Create middleware in src/Middlewares/ directory
+   - Implement MiddlewareInterface
+   - Add through middleware() method in route definition
 
-3. **控制器开发**
+3. **Controller Development**
 
-   - 在 src/Controllers/ 目录下创建控制器
-   - 继承 BaseController
-   - 通过 $request 对象获取请求数据
-   - 返回 Response 对象
+   - Create controllers in src/Controllers/ directory
+   - Extend BaseController
+   - Get request data through $request object
+   - Return Response object
 
-4. **DTO 转换**
+4. **DTO Conversion**
 
-   - 在 src/DTO/ 目录下定义 DTO 类
-   - 使用 Validator 进行数据验证
-   - 通过 toArray() 方法转换为数组
+   - Define DTO classes in src/DTO/ directory
+   - Use Validator for data validation
+   - Convert to array through toArray() method
 
-5. **服务层开发**
+5. **Service Layer Development**
 
-   - 在 src/Services/ 目录下创建服务类
-   - 继承 BaseService
-   - 通过依赖注入使用 Repository
+   - Create service classes in src/Services/ directory
+   - Extend BaseService
+   - Use Repository through dependency injection
 
-6. **实体与仓储**
-   - 在 src/Entity/ 定义实体类
-   - 在 src/Repository/ 实现仓储接口
-   - 使用 DatabaseServiceProvider 注册仓储
+6. **Entity and Repository**
+   - Define entity classes in src/Entity/
+   - Implement repository interfaces in src/Repository/
+   - Register repositories using DatabaseServiceProvider
 
-## TODO: 未来架构改进计划
+## TODO: Future Architecture Improvements
 
-### 架构迁移
+### Architecture Migration
 
-- [ ] 从分层架构迁移到 DDD（领域驱动设计）架构
-- [ ] 按业务领域划分模块
-- [ ] 定义聚合根和值对象
-- [ ] 实现领域服务
-- [ ] 实现 CQRS 模式
-- [ ] 添加事件驱动机制
-- [ ] 实现领域事件
+- [ ] Migrate from layered architecture to DDD (Domain-Driven Design)
+- [ ] Divide modules by business domain
+- [ ] Define aggregate roots and value objects
+- [ ] Implement domain services
+- [ ] Implement CQRS pattern
+- [ ] Add event-driven mechanism
+- [ ] Implement domain events
 
-### 基础设施
+### Infrastructure
 
-- [ ] 添加消息队列支持（RabbitMQ/Kafka）
-- [ ] 实现分布式缓存（Redis/Memcached）
-- [ ] 添加监控和日志追踪（Prometheus + Grafana）
-- [ ] 实现 API 网关
-- [ ] 添加服务发现机制
-- [ ] 实现自动扩展（Auto-scaling）
-- [ ] 实现节点快照功能
+- [ ] Add message queue support (RabbitMQ/Kafka)
+- [ ] Implement distributed caching (Redis/Memcached)
+- [ ] Add monitoring and log tracing (Prometheus + Grafana)
+- [ ] Implement API gateway
+- [ ] Add service discovery mechanism
+- [ ] Implement auto-scaling
+- [ ] Implement node snapshot functionality
 
-### 测试改进
+### Testing Improvements
 
-- [ ] 添加集成测试
-- [ ] 实现契约测试
-- [ ] 添加性能测试
-- [ ] 实现混沌工程测试
-- [ ] 添加安全测试
+- [ ] Add integration tests
+- [ ] Implement contract tests
+- [ ] Add performance tests
+- [ ] Implement chaos engineering tests
+- [ ] Add security tests
 
-### 当前未实现功能
+### Current Unimplemented Features
 
-- [ ] 用户认证与授权（JWT/OAuth2）
-- [ ] 文件上传与存储
-- [ ] 数据分页与排序
-- [ ] 数据导出功能（CSV/Excel）
-- [ ] 定时任务调度
-- [ ] 邮件通知服务
-- [ ] 短信验证码服务
-- [ ] 第三方登录集成
-- [ ] API 文档自动生成
-- [ ] 数据迁移工具
+- [ ] User authentication and authorization (JWT/OAuth2)
+- [ ] File upload and storage
+- [ ] Data pagination and sorting
+- [ ] Data export functionality (CSV/Excel)
+- [ ] Scheduled task scheduling
+- [ ] Email notification service
+- [ ] SMS verification service
+- [ ] Third-party login integration
+- [ ] API documentation auto-generation
+- [ ] Data migration tools
 
-## 项目结构
+## Project Structure
 
 ```
 .
-├── config/               # 配置文件
-│   ├── .env              # 环境变量
-│   └── .env.sample       # 环境变量示例
-├── database/             # 数据库相关文件
-│   ├── migrate.php       # 数据库迁移脚本
-│   └── migrations/       # 数据库迁移文件
-├── docs/                 # 项目文档
-├── logs/                 # 系统日志文件
-├── scripts/              # 部署和维护脚本
-├── src/                  # 核心代码
-│   ├── Config/           # 配置类
-│   │   ├── Config.php    # 配置管理
-│   │   └── Routes.php    # 路由配置
-│   ├── Controllers/      # 控制器
-│   ├── DTO/              # 数据传输对象
-│   ├── Entity/           # 实体类
-│   ├── Exceptions/       # 自定义异常
-│   ├── Http/             # HTTP相关组件
-│   │   ├── Request.php   # HTTP请求处理
-│   │   └── Response.php  # HTTP响应处理
-│   ├── Interfaces/       # 接口定义
-│   │   ├── MiddlewareInterface.php  # 中间件接口
-│   │   └── ModelInterface.php       # 模型接口
-│   ├── Logs/             # 日志处理
-│   │   ├── Logger.php    # 日志记录
-│   │   └── LogRotateService.php # 日志轮转服务
-│   ├── Middlewares/      # 中间件
-│   │   ├── MiddlewareStack.php      # 中间件栈
-│   │   ├── TestConditionMiddleware.php # 测试条件中间件
-│   │   └── TestFlowMiddleware.php   # 测试流程中间件
-│   ├── Providers/        # 服务提供者
-│   │   └── DatabaseServiceProvider.php # 数据库服务提供者
-│   ├── Repository/       # 数据访问层
-│   ├── Routes/           # 路由定义
-│   │   ├── Route.php     # 路由类
-│   │   └── Router.php    # 路由器
-│   ├── Server/           # 服务器配置
-│   │   └── ApiServer.php # API服务器
-│   ├── Services/         # 业务逻辑
-│   ├── Utils/            # 工具类
-│   │   └── Container.php # 依赖注入容器
-│   └── Validator/        # 数据验证
-│       └── Validator.php # 验证器
-├── tests/                # 测试代码
-│   ├── http/             # HTTP API测试
-│   │   ├── middleware-api.http # 中间件API测试
-│   │   └── user-api.http       # 用户API测试
-│   └── Validator/        # 验证器测试
+├── config/               # Configuration files
+│   ├── .env              # Environment variables
+│   └── .env.sample       # Environment variables example
+├── database/             # Database related files
+│   ├── migrate.php       # Database migration script
+│   └── migrations/       # Database migration files
+├── docs/                 # Project documentation
+├── logs/                 # System log files
+├── scripts/              # Deployment and maintenance scripts
+├── src/                  # Core code
+│   ├── Config/           # Configuration classes
+│   │   ├── Config.php    # Configuration management
+│   │   └── Routes.php    # Route configuration
+│   ├── Controllers/      # Controllers
+│   ├── DTO/              # Data Transfer Objects
+│   ├── Entity/           # Entity classes
+│   ├── Exceptions/       # Custom exceptions
+│   ├── Http/             # HTTP related components
+│   │   ├── Request.php   # HTTP request handling
+│   │   └── Response.php  # HTTP response handling
+│   ├── Interfaces/       # Interface definitions
+│   │   ├── MiddlewareInterface.php  # Middleware interface
+│   │   └── ModelInterface.php       # Model interface
+│   ├── Logs/             # Log handling
+│   │   ├── Logger.php    # Log recording
+│   │   └── LogRotateService.php # Log rotation service
+│   ├── Middlewares/      # Middleware
+│   │   ├── MiddlewareStack.php      # Middleware stack
+│   │   ├── TestConditionMiddleware.php # Test condition middleware
+│   │   └── TestFlowMiddleware.php   # Test flow middleware
+│   ├── Providers/        # Service providers
+│   │   └── DatabaseServiceProvider.php # Database service provider
+│   ├── Repository/       # Data access layer
+│   ├── Routes/           # Route definitions
+│   │   ├── Route.php     # Route class
+│   │   └── Router.php    # Router
+│   ├── Server/           # Server configuration
+│   │   └── ApiServer.php # API server
+│   ├── Services/         # Business logic
+│   ├── Utils/            # Utility classes
+│   │   └── Container.php # Dependency injection container
+│   └── Validator/        # Data validation
+│       └── Validator.php # Validator
+├── tests/                # Test code
+│   ├── http/             # HTTP API tests
+│   │   ├── middleware-api.http # Middleware API test
+│   │   └── user-api.http       # User API test
+│   └── Validator/        # Validator tests
 │       └── ValidatorTest.php
-└── README.md             # 项目说明
+└── README.md             # Project documentation
 ```
 
-## 各目录用途
+## Directory Purposes
 
-- **config/**: 存放项目配置文件，包含环境变量和配置类
-- **docs/**: 项目相关文档
-- **scripts/**: 部署脚本、维护脚本等
-- **src/**: 项目核心代码
-  - **DTO/**: 数据传输对象，用于层间数据传输
-  - **Models/**: 数据模型，定义数据结构和业务实体
-  - **Repositories/**: 数据访问层，负责与数据库交互
-  - **Services/**: 业务逻辑层，处理核心业务
-  - **Controllers/**: 控制器，处理HTTP请求
-  - **Middlewares/**: 中间件，处理请求预处理和响应后处理
-  - **Routes/**: 路由定义，映射URL到控制器
-  - **Utils/**: 工具类，提供通用功能
-  - **Logs/**: 日志处理
-  - **Exceptions/**: 自定义异常处理
-  - **Interfaces/**: 接口定义
-  - **Http/**: HTTP相关组件，包含请求/响应处理、表单验证等
-  - **Server/**: 服务器相关配置
-- **tests/**: 单元测试和功能测试代码
+- **config/**: Store project configuration files, including environment variables and configuration classes
+- **docs/**: Project related documentation
+- **scripts/**: Deployment scripts, maintenance scripts, etc.
+- **src/**: Project core code
+  - **DTO/**: Data Transfer Objects for inter-layer data transfer
+  - **Models/**: Data models, defining data structures and business entities
+  - **Repositories/**: Data access layer, responsible for database interaction
+  - **Services/**: Business logic layer, handling core business
+  - **Controllers/**: Controllers, handling HTTP requests
+  - **Middlewares/**: Middleware, handling request pre-processing and response post-processing
+  - **Routes/**: Route definitions, mapping URLs to controllers
+  - **Utils/**: Utility classes, providing common functionality
+  - **Logs/**: Log handling
+  - **Exceptions/**: Custom exception handling
+  - **Interfaces/**: Interface definitions
+  - **Http/**: HTTP related components, including request/response handling, form validation, etc.
+  - **Server/**: Server related configuration
+- **tests/**: Unit tests and functional test code
 
-## 代码检查与格式化
+## Code Check and Formatting
 
-项目使用以下工具来保持代码质量和风格一致：
+The project uses the following tools to maintain code quality and consistent style:
 
-- **PHP_CodeSniffer**: 检查代码风格并检测常见错误
-- **PHP-CS-Fixer**: 自动修复代码风格问题
-- **PHPUnit**: 单元测试框架，用于功能测试和错误检测
+- **PHP_CodeSniffer**: Check code style and detect common errors
+- **PHP-CS-Fixer**: Automatically fix code style issues
+- **PHPUnit**: Unit testing framework for functional testing and error detection
 
-注意：这些工具主要用于代码风格检查和格式化，虽然可以发现一些语法错误，但不能替代专业的静态代码分析工具。
+Note: These tools are mainly used for code style checking and formatting. While they can detect some syntax errors, they cannot replace professional static code analysis tools.
 
-### 工具安装
+### Tool Installation
 
 ```bash
 composer require --dev squizlabs/php_codesniffer friendsofphp/php-cs-fixer
 ```
 
-### 使用
+### Usage
 
-1. 检查代码风格：
+1. Check code style:
 
 ```bash
 ./vendor/bin/phpcs
 ```
 
-2. 自动修复代码风格：
+2. Automatically fix code style:
 
 ```bash
 ./vendor/bin/phpcbf
 ```
 
-3. 使用 PHP-CS-Fixer 格式化代码：
+3. Format code using PHP-CS-Fixer:
 
 ```bash
 PHP_CS_FIXER_IGNORE_ENV=1 ./vendor/bin/php-cs-fixer fix
 ```
 
-注意：当前 PHP 版本 (8.4.3) 高于 PHP-CS-Fixer 支持的最高版本 (8.3.\*)，需要设置 PHP_CS_FIXER_IGNORE_ENV 环境变量来忽略版本检查。
+Note: Current PHP version (8.4.3) is higher than the maximum version supported by PHP-CS-Fixer (8.3.\*), need to set PHP_CS_FIXER_IGNORE_ENV environment variable to ignore version check.
 
-### 配置
+### Configuration
 
-- `phpcs.xml`: PHP_CodeSniffer 配置文件
-- `.php-cs-fixer.php`: PHP-CS-Fixer 配置文件
+- `phpcs.xml`: PHP_CodeSniffer configuration file
+- `.php-cs-fixer.php`: PHP-CS-Fixer configuration file
 
-## 贡献指南
+## Contribution Guidelines
 
-我们欢迎任何形式的贡献！在开始贡献之前，请先阅读以下指南。
+We welcome any form of contribution! Before starting to contribute, please read the following guidelines.
 
-### 开发流程
+### Development Process
 
-1. Fork 项目仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 提交 Pull Request
+1. Fork project repository
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Submit Pull Request
 
-### 代码风格
+### Code Style
 
-- 遵循 PSR-12 编码规范
-- 使用 PHP_CodeSniffer 检查代码风格
-- 使用 PHP-CS-Fixer 自动格式化代码
-- 类名使用大驼峰式命名 (UpperCamelCase)
-- 方法名使用小驼峰式命名 (lowerCamelCase)
-- 常量名使用全大写加下划线 (UPPER_CASE)
-- 变量名使用小驼峰式命名 (lowerCamelCase)
+- Follow PSR-12 coding standard
+- Use PHP_CodeSniffer to check code style
+- Use PHP-CS-Fixer to automatically format code
+- Use UpperCamelCase for class names
+- Use lowerCamelCase for method names
+- Use UPPER_CASE for constants
+- Use lowerCamelCase for variable names
 
-### 测试要求
+### Testing Requirements
 
-- 所有新功能必须包含单元测试
-- 修复 bug 时必须添加回归测试
-- 测试覆盖率应保持在 80% 以上
-- 使用 `.http` 文件进行 API 测试
-- 推荐使用以下工具：
-  - **REST Client** (VSCode 插件)
-    - 安装：在 VSCode 扩展商店搜索 "REST Client" 并安装
-    - 使用：直接打开 `.http` 文件，点击 "Send Request" 按钮即可运行测试
+- All new features must include unit tests
+- Bug fixes must include regression tests
+- Test coverage should remain above 80%
+- Use `.http` files for API testing
+- Recommended tools:
+  - **REST Client** (VSCode plugin)
+    - Installation: Search for "REST Client" in VSCode extension marketplace and install
+    - Usage: Open `.http` file directly, click "Send Request" button to run test
   - **Postman**
-    - 导入 `.http` 文件进行测试
-    - 支持更复杂的测试场景和自动化测试
+    - Import `.http` files for testing
+    - Support more complex test scenarios and automated testing
 
-### 运行测试
+### Running Tests
 
 ```bash
-# 运行所有测试
+# Run all tests
 ./vendor/bin/phpunit
 
-# 运行指定测试文件
+# Run specific test file
 ./vendor/bin/phpunit tests/Validator/ValidatorTest.php
 ```
 
-### Pull Request 规范
+### Pull Request Guidelines
 
-- 标题格式：[类型] 简短描述
-  - 示例：[Feature] 添加用户认证功能
-  - 类型包括：Feature, Bugfix, Refactor, Docs, Style, Test
-- 描述部分需包含：
-  - 解决的问题或实现的功能
-  - 测试结果
-  - 相关 issue 编号（如果有）
-  - 重大变更说明（如果有）
-- 确保所有测试通过
-- 确保代码风格符合规范
-- 确保文档及时更新
+- Title format: [Type] Brief description
+  - Example: [Feature] Add user authentication
+  - Types include: Feature, Bugfix, Refactor, Docs, Style, Test
+- Description should include:
+  - Problem solved or feature implemented
+  - Test results
+  - Related issue number (if any)
+  - Breaking changes description (if any)
+- Ensure all tests pass
+- Ensure code style compliance
+- Ensure documentation is updated
 
-## 安装与配置
+## Installation and Configuration
 
-### 环境要求
+### Requirements
 
-- PHP 8.4.3 或更高版本
-- Composer 2.0 或更高版本
-- Swoole 6.0.0 或更高版本
-- MySQL 8.0 或更高版本
-- Redis 6.0 或更高版本（可选）
+- PHP 8.4.3 or higher
+- Composer 2.0 or higher
+- Swoole 6.0.0 or higher
+- MySQL 8.0 or higher
+- Redis 6.0 or higher (optional)
 
-### 安装步骤
+### Installation Steps
 
-1. 克隆项目：
+1. Clone project:
 
 ```bash
-git clone https://github.com/yourusername/rtp-bridge-backend.git
-cd rtp-bridge-backend
+git clone https://github.com/fwx5618177/rtp.git
+cd rtp
 ```
 
-2. 安装依赖：
+2. Install dependencies:
 
 ```bash
 composer install
 ```
 
-3. 安装 Swoole 扩展：
+3. Install Swoole extension:
 
 ```bash
 pecl install swoole
 ```
 
-注意：Swoole 需要 PHP 启用线程安全（ZTS）模式编译。如果遇到安装问题，请确保：
+Note: Swoole requires PHP to be compiled with ZTS (Zend Thread Safety) enabled. If you encounter installation issues, ensure:
 
-- PHP 使用 --enable-zts 参数编译
-- 检查 php -i | grep Thread 输出包含 "Thread Safety => enabled"
-- 如果使用 brew 安装的 PHP，建议使用 brew install php --with-zts 重新安装
+- PHP was compiled with --enable-zts parameter
+- Check php -i | grep Thread output includes "Thread Safety => enabled"
+- If using brew-installed PHP, recommend reinstalling with brew install php --with-zts
 
-4. 启用 Swoole 扩展：
+4. Enable Swoole extension:
 
 ```bash
 echo "extension=swoole.so" >> $(php -i | grep "Loaded Configuration File" | awk '{print $5}')
 ```
 
-5. 配置环境变量：
+5. Configure environment variables:
 
 ```bash
 cp config/.env.sample config/.env
 ```
 
-编辑 config/.env 文件，配置以下内容：
+Edit config/.env file, configure the following:
 
 ```env
-# 应用配置
+# Application configuration
 APP_ENV=local
 APP_DEBUG=true
 APP_KEY=base64:your_app_key
 
-# 数据库配置
+# Database configuration
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
@@ -367,55 +367,55 @@ DB_DATABASE=rtp
 DB_USERNAME=root
 DB_PASSWORD=
 
-# Redis 配置（可选）
+# Redis configuration (optional)
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 REDIS_PASSWORD=null
 
-# Swoole 配置
+# Swoole configuration
 SWOOLE_HOST=0.0.0.0
 SWOOLE_PORT=9501
 SWOOLE_WORKER_NUM=4
 SWOOLE_TASK_WORKER_NUM=2
 ```
 
-6. 生成应用密钥：
+6. Generate application key:
 
 ```bash
 php artisan key:generate
 ```
 
-7. 运行数据库迁移：
+7. Run database migrations:
 
 ```bash
 php database/migrate.php
 ```
 
-8. 启动开发服务器：
+8. Start development server:
 
 ```bash
 php src/index.php
 ```
 
-### 默认配置
+### Default Configuration
 
-- 监听地址：0.0.0.0
-- 监听端口：9501
-- 访问地址：http://localhost:9501
+- Listen address: 0.0.0.0
+- Listen port: 9501
+- Access address: http://localhost:9501
 
-## 社区指南
+## Community Guidelines
 
-- [行为准则](CODE_OF_CONDUCT.md) - 我们的社区行为标准
-- [安全策略](SECURITY.md) - 如何报告安全问题
+- [Code of Conduct](CODE_OF_CONDUCT.md) - Our community behavior standards
+- [Security Policy](SECURITY.md) - How to report security issues
 
-## 许可证
+## License
 
-本项目采用 [MIT 许可证](LICENSE) 发布。
+This project is released under the [MIT License](LICENSE).
 
 ```text
 MIT License
 
-Copyright (c) 2023 Your Name
+Copyright (c) 2023 fwx5618177 <fwx5618177@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

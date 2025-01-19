@@ -1,64 +1,64 @@
-# 安全策略
+# Security Policy
 
-## 支持的版本
+## Supported Versions
 
-我们为以下版本提供安全更新：
+We provide security updates for the following versions:
 
-| 版本 | 支持状态                |
-| ---- | ----------------------- |
-| 1.x  | :white_check_mark: 支持 |
-| 0.x  | :x: 不再支持            |
+| Version | Supported          |
+| ------- | ------------------ |
+| 1.x     | :white_check_mark: |
+| 0.x     | :x:                |
 
-## 报告漏洞
+## Reporting a Vulnerability
 
-如果您发现任何安全漏洞，请不要在 GitHub 上创建 issue。请通过以下方式报告：
+If you discover any security vulnerabilities, please do not create an issue on GitHub. Instead, report them through the following channels:
 
-1. 发送邮件至 [security@example.com](mailto:security@example.com)
-2. 在邮件标题中包含 "[Security]" 前缀
-3. 详细描述漏洞情况，包括：
-   - 受影响的版本
-   - 漏洞的具体表现
-   - 重现步骤
-   - 可能的影响范围
+1. Send an email to [fwx5618177@gmail.com](mailto:fwx5618177@gmail.com)
+2. Include "[Security]" prefix in the email subject
+3. Provide detailed description of the vulnerability, including:
+   - Affected versions
+   - Specific vulnerability details
+   - Steps to reproduce
+   - Potential impact scope
 
-我们会在收到报告后 48 小时内确认，并在确认漏洞后 7 天内发布修复补丁。
+We will acknowledge receipt within 48 hours and release a patch within 7 days after confirmation.
 
-## 安全更新流程
+## Security Update Process
 
-1. 安全团队评估漏洞严重程度
-2. 创建私有安全修复分支
-3. 开发修复补丁并进行内部测试
-4. 发布新版本并更新 CHANGELOG.md
-5. 在安全公告中披露漏洞信息
+1. Security team assesses vulnerability severity
+2. Create private security fix branch
+3. Develop and internally test patches
+4. Release new version and update CHANGELOG.md
+5. Disclose vulnerability information in security advisory
 
-## 安全最佳实践
+## Security Best Practices
 
-### 对于开发者
+### For Developers
 
-- 使用最新稳定版本
-- 定期更新依赖项
-- 启用自动安全更新
-- 遵循最小权限原则
-- 使用安全的密码存储方案
-- 验证所有用户输入
+- Use the latest stable version
+- Regularly update dependencies
+- Enable automatic security updates
+- Follow principle of least privilege
+- Use secure password storage
+- Validate all user input
 
-### 对于系统管理员
+### For System Administrators
 
-- 保持操作系统和软件最新
-- 使用防火墙限制访问
-- 启用日志记录和监控
-- 定期备份数据
-- 使用强密码策略
-- 限制特权账户的使用
+- Keep OS and software up to date
+- Use firewall to restrict access
+- Enable logging and monitoring
+- Perform regular backups
+- Implement strong password policy
+- Limit privileged account usage
 
-## 已知安全问题
+## Known Security Issues
 
-| 问题 | 影响版本 | 修复版本 | 严重程度 | 备注 |
-| ---- | -------- | -------- | -------- | ---- |
-| 无   | -        | -        | -        | -    |
+| Issue | Affected Versions | Fixed Version | Severity | Notes |
+| ----- | ----------------- | ------------- | -------- | ----- |
+| None  | -                 | -             | -        | -     |
 
-## 联系方式
+## Contact
 
-如有任何安全问题，请联系：[security@example.com](mailto:security@example.com)
+For any security concerns, please contact: [fwx5618177@gmail.com](mailto:fwx5618177@gmail.com)
 
-我们承诺在 48 小时内回复所有安全相关的咨询。
+We commit to responding to all security-related inquiries within 48 hours.
