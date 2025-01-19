@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Logs\Logger;
+use App\Utils\Container;
 
 abstract class BaseEntity
 {
@@ -10,7 +11,7 @@ abstract class BaseEntity
 
     public function __construct()
     {
-        $this->logger = Logger::getInstance(static::class);
+        $this->logger = Container::getInstance()->get(Logger::class);
     }
 
     public function logOperation(string $operation): void

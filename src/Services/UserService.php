@@ -6,19 +6,20 @@ use App\DTO\UserDTO;
 use App\Entity\UserEntity;
 use App\Repository\UserRepository;
 use App\Exceptions\ValidationException;
-use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityManager;
 use App\Logs\Logger;
+use App\Utils\Container;
 
 class UserService extends BaseService
 {
     private Logger $logger;
 
     public function __construct(
-        private UserRepository $userRepository,
-        private EntityManagerInterface $entityManager
+        protected UserRepository $userRepository,
+        protected EntityManager $entityManager
     ) {
         parent::__construct();
-        $this->logger = Logger::getInstance('user-service');
+        $this->logger = Container::getInstance()->get(Logger::class);
     }
 
     public function registerUser(UserDTO $dto): UserEntity
