@@ -28,7 +28,8 @@ class UserDTO extends BaseDTO
         public ?string $createdAt = null,
         public ?string $updatedAt = null,
         public ?string $deletedAt = null
-    ) {}
+    ) {
+    }
 
     public static function fromRequest(Request $request): self
     {
@@ -42,7 +43,7 @@ class UserDTO extends BaseDTO
             'password' => 'required|min:6',
             'firstName' => 'string|nullable',
             'lastName' => 'string|nullable',
-            'phone' => 'string|nullable|max:20'
+            'phone' => 'string|nullable|max:20',
         ]);
 
         return new self(
@@ -113,7 +114,7 @@ class UserDTO extends BaseDTO
             $user->setRoles($this->roles);
         }
 
-        if (!$this->isActive) {
+        if (! $this->isActive) {
             $user->setIsActive(false);
         }
 
@@ -142,7 +143,7 @@ class UserDTO extends BaseDTO
             'createdAt' => $this->createdAt,
             'updatedAt' => $this->updatedAt,
             'lastLoginAt' => $this->lastLoginAt,
-            'deletedAt' => $this->deletedAt
+            'deletedAt' => $this->deletedAt,
         ];
     }
 
@@ -160,7 +161,7 @@ class UserDTO extends BaseDTO
             'lastName' => 'string|nullable',
             'phone' => 'string|nullable|max:20',
             'roles' => 'array|nullable',
-            'isActive' => 'boolean|nullable'
+            'isActive' => 'boolean|nullable',
         ]);
 
         // 处理日期时间字段

@@ -25,6 +25,7 @@ class Config
         if (self::$instance === null) {
             self::$instance = new self(__DIR__ . '/../../config/.env');
         }
+
         return self::$instance;
     }
 
@@ -35,11 +36,12 @@ class Config
 
     private function loadEnv(): void
     {
-        if (!file_exists($this->envPath)) {
+        if (! file_exists($this->envPath)) {
             $message = '.env file not found at ' . $this->envPath;
             if ($this->logger) {
                 $this->logger->error($message);
             }
+
             throw new ConfigException($message);
         }
 
@@ -60,6 +62,7 @@ class Config
             if ($this->logger) {
                 $this->logger->error($message);
             }
+
             throw new ConfigException($message);
         }
 
@@ -73,7 +76,7 @@ class Config
         if ($this->logger) {
             $this->logger->debug('Config key check', [
                 'key' => $key,
-                'exists' => $exists
+                'exists' => $exists,
             ]);
         }
 

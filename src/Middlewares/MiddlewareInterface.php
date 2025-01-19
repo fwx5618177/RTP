@@ -8,4 +8,4 @@ use App\Http\Response;
 interface MiddlewareInterface
 {
     public function process(Request $request, Response $response, callable $next): Response;
-} 
+}

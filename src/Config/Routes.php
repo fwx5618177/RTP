@@ -6,8 +6,8 @@ namespace App\Config;
 
 use App\Controllers\HomeController;
 use App\Controllers\UserController;
-use App\Middlewares\TestFlowMiddleware;
 use App\Middlewares\TestConditionMiddleware;
+use App\Middlewares\TestFlowMiddleware;
 use App\Routes\Router;
 
 return function (Router $router) {
@@ -19,7 +19,7 @@ return function (Router $router) {
 
     $router->group([
         'prefix' => '/api/test',
-        'middleware' => [new TestConditionMiddleware()]
+        'middleware' => [new TestConditionMiddleware()],
     ], function ($route) {
         $route->add('GET', '/', [HomeController::class, 'index']);
     });
@@ -27,7 +27,7 @@ return function (Router $router) {
     // 用户相关路由组
     $router->group([
         'prefix' => '/api/users',
-        'middleware' => [new TestConditionMiddleware()]
+        'middleware' => [new TestConditionMiddleware()],
     ], function ($route) {
         $route->add('GET', '/', [UserController::class, 'index']);
         $route->add('POST', '/', [UserController::class, 'create']);

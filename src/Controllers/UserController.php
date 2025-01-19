@@ -2,13 +2,13 @@
 
 namespace App\Controllers;
 
+use App\DTO\UserDTO;
+use App\Exceptions\ValidationException;
 use App\Http\Request;
 use App\Http\Response;
-use App\DTO\UserDTO;
-use App\Services\UserService;
-use App\Exceptions\ValidationException;
-use Psr\Container\ContainerInterface;
 use App\Logs\Logger;
+use App\Services\UserService;
+use Psr\Container\ContainerInterface;
 
 class UserController extends BaseController
 {
@@ -32,7 +32,7 @@ class UserController extends BaseController
             $total = $this->userService->countUsers();
 
             $userDTOs = array_map(
-                fn($user) => UserDTO::fromEntity($user)->toArray(),
+                fn ($user) => UserDTO::fromEntity($user)->toArray(),
                 $users
             );
 
@@ -40,7 +40,7 @@ class UserController extends BaseController
                 'users' => $userDTOs,
                 'total' => $total,
                 'page' => $page,
-                'limit' => $limit
+                'limit' => $limit,
             ]);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422);
@@ -55,7 +55,7 @@ class UserController extends BaseController
                 'method' => $request->getMethod(),
                 'headers' => $request->getHeaders(),
                 'body' => $request->getBodyParams(),
-                'query' => $request->getQueryParams()
+                'query' => $request->getQueryParams(),
             ]);
 
             // 获取请求体
@@ -66,6 +66,7 @@ class UserController extends BaseController
             // 验证必填字段
             if (empty($requestBody['username']) || empty($requestBody['email']) || empty($requestBody['password'])) {
                 $this->logger->error('Validation failed - Missing required fields', ['requestBody' => $requestBody]);
+
                 return $this->errorResponse('Missing required fields');
             }
 
@@ -81,13 +82,14 @@ class UserController extends BaseController
             return $this->successResponse([
                 'id' => $user->getId(),
                 'username' => $user->getUsername(),
-                'email' => $user->getEmail()
+                'email' => $user->getEmail(),
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Error creating user', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return $this->errorResponse($e->getMessage());
         }
     }
@@ -96,9 +98,10 @@ class UserController extends BaseController
     {
         try {
             $user = $this->userService->getUserById($id);
-            if (!$user) {
+            if (! $user) {
                 return $this->errorResponse('User not found', 404);
             }
+
             return $this->successResponse(UserDTO::fromEntity($user)->toArray());
         } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422);
@@ -109,7 +112,7 @@ class UserController extends BaseController
     {
         try {
             $existingUser = $this->userService->getUserById($id);
-            if (!$existingUser) {
+            if (! $existingUser) {
                 return $this->errorResponse('User not found', 404);
             }
 
@@ -136,13 +139,14 @@ class UserController extends BaseController
     {
         try {
             $user = $this->userService->getUserById($id);
-            if (!$user) {
+            if (! $user) {
                 return $this->errorResponse('User not found', 404);
             }
 
             $this->userService->deleteUser($id);
+
             return $this->successResponse([
-                'message' => 'User deleted successfully'
+                'message' => 'User deleted successfully',
             ], 204);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422);

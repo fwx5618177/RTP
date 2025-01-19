@@ -76,3 +76,40 @@
   - **Http/**: HTTP相关组件，包含请求/响应处理、表单验证等
   - **Server/**: 服务器相关配置
 - **tests/**: 单元测试和功能测试代码
+
+## 代码格式化
+
+项目使用 PHP_CodeSniffer 和 PHP-CS-Fixer 来保持代码风格一致。
+
+### 安装
+
+```bash
+composer require --dev squizlabs/php_codesniffer friendsofphp/php-cs-fixer
+```
+
+### 使用
+
+1. 检查代码风格：
+
+```bash
+./vendor/bin/phpcs
+```
+
+2. 自动修复代码风格：
+
+```bash
+./vendor/bin/phpcbf
+```
+
+3. 使用 PHP-CS-Fixer 格式化代码：
+
+```bash
+PHP_CS_FIXER_IGNORE_ENV=1 ./vendor/bin/php-cs-fixer fix
+```
+
+注意：当前 PHP 版本 (8.4.3) 高于 PHP-CS-Fixer 支持的最高版本 (8.3.\*)，需要设置 PHP_CS_FIXER_IGNORE_ENV 环境变量来忽略版本检查。
+
+### 配置
+
+- `phpcs.xml`: PHP_CodeSniffer 配置文件
+- `.php-cs-fixer.php`: PHP-CS-Fixer 配置文件

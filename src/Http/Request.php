@@ -51,7 +51,7 @@ class Request
             $this->logger->debug('Parsed request body', [
                 'method' => $this->method,
                 'contentType' => $this->getHeader('content-type'),
-                'bodyParams' => $this->bodyParams
+                'bodyParams' => $this->bodyParams,
             ]);
         }
     }
@@ -66,7 +66,7 @@ class Request
 
         $this->logger->debug('Parsing request body', [
             'contentType' => $contentType,
-            'rawBody' => $this->rawBody
+            'rawBody' => $this->rawBody,
         ]);
 
         if (empty($this->rawBody)) {
@@ -77,13 +77,16 @@ class Request
             $data = json_decode($this->rawBody, true);
             if (json_last_error() !== JSON_ERROR_NONE) {
                 $this->logger->error('JSON decode error', ['error' => json_last_error_msg()]);
+
                 return [];
             }
+
             return $data ?? [];
         }
 
         if (str_contains(strtolower($contentType), 'application/x-www-form-urlencoded')) {
             parse_str($this->rawBody, $data);
+
             return $data;
         }
 
@@ -120,7 +123,9 @@ class Request
         $headers = [];
         $server = [];
         while ($line = array_shift($lines)) {
-            if (empty($line)) break;
+            if (empty($line)) {
+                break;
+            }
 
             // 解析header行
             if (str_contains($line, ':')) {
@@ -242,6 +247,7 @@ class Request
     public function getHeader(string $name): ?string
     {
         $name = strtolower($name);
+
         return $this->headers[$name] ?? null;
     }
 
@@ -292,6 +298,7 @@ class Request
                 $headers[$name] = $value;
             }
         }
+
         return $headers;
     }
 

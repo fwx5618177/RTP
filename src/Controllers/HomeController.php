@@ -12,7 +12,7 @@ class HomeController extends BaseController
         return new Response([
             'message' => 'Welcome to RTP Bridge API',
             'version' => '1.0.0',
-            'status' => 'running'
+            'status' => 'running',
         ]);
     }
 }

@@ -14,51 +14,51 @@ class Validator
     {
         $this->validationStates = [
             'required' => [
-                'validate' => fn($value) => isset($value) && !empty($value),
-                'message' => 'The {field} field is required'
+                'validate' => fn ($value) => isset($value) && ! empty($value),
+                'message' => 'The {field} field is required',
             ],
             'string' => [
-                'validate' => fn($value) => !isset($value) || is_string($value),
-                'message' => 'The {field} must be a string'
+                'validate' => fn ($value) => ! isset($value) || is_string($value),
+                'message' => 'The {field} must be a string',
             ],
             'email' => [
-                'validate' => fn($value) => !isset($value) || filter_var($value, FILTER_VALIDATE_EMAIL),
-                'message' => 'The {field} must be a valid email address'
+                'validate' => fn ($value) => ! isset($value) || filter_var($value, FILTER_VALIDATE_EMAIL),
+                'message' => 'The {field} must be a valid email address',
             ],
             'min' => [
-                'validate' => fn($value, $params) => !isset($value) || (
+                'validate' => fn ($value, $params) => ! isset($value) || (
                     is_string($value) ?
                     strlen($value) >= (int)$params[0] : (is_numeric($value) ? $value >= (int)$params[0] : false)
                 ),
-                'message' => fn($value) => is_numeric($value) ?
+                'message' => fn ($value) => is_numeric($value) ?
                     'The {field} must be at least {param}' :
-                    'The {field} must be at least {param} characters'
+                    'The {field} must be at least {param} characters',
             ],
             'max' => [
-                'validate' => fn($value, $params) => !isset($value) || (
+                'validate' => fn ($value, $params) => ! isset($value) || (
                     is_string($value) ?
                     strlen($value) <= (int)$params[0] : (is_numeric($value) ? $value <= (int)$params[0] : false)
                 ),
-                'message' => fn($value) => is_numeric($value) ?
+                'message' => fn ($value) => is_numeric($value) ?
                     'The {field} must not exceed {param}' :
-                    'The {field} must not exceed {param} characters'
+                    'The {field} must not exceed {param} characters',
             ],
             'numeric' => [
-                'validate' => fn($value) => is_numeric($value),
-                'message' => 'The {field} must be numeric'
+                'validate' => fn ($value) => is_numeric($value),
+                'message' => 'The {field} must be numeric',
             ],
             'alpha' => [
-                'validate' => fn($value) => ctype_alpha($value),
-                'message' => 'The {field} must only contain letters'
+                'validate' => fn ($value) => ctype_alpha($value),
+                'message' => 'The {field} must only contain letters',
             ],
             'alphaNum' => [
-                'validate' => fn($value) => ctype_alnum($value),
-                'message' => 'The {field} must only contain letters and numbers'
+                'validate' => fn ($value) => ctype_alnum($value),
+                'message' => 'The {field} must only contain letters and numbers',
             ],
             'startsWith' => [
-                'validate' => fn($value, $params) => str_starts_with($value, $params[0]),
-                'message' => 'The {field} must start with {param}'
-            ]
+                'validate' => fn ($value, $params) => str_starts_with($value, $params[0]),
+                'message' => 'The {field} must start with {param}',
+            ],
         ];
     }
 
@@ -72,7 +72,7 @@ class Validator
             $value = $this->data[$field] ?? null;
 
             // 如果字段不是必填且值为空，跳过其他验证
-            if (!in_array('required', $fieldRules) && empty($value)) {
+            if (! in_array('required', $fieldRules) && empty($value)) {
                 continue;
             }
 
@@ -87,12 +87,12 @@ class Validator
                 }
 
                 // 检查规则是否存在
-                if (!isset($this->validationStates[$rule])) {
+                if (! isset($this->validationStates[$rule])) {
                     continue;
                 }
 
                 $state = $this->validationStates[$rule];
-                if (!$state['validate']($value, $params)) {
+                if (! $state['validate']($value, $params)) {
                     $message = is_callable($state['message']) ?
                         $state['message']($value) :
                         $state['message'];
@@ -107,7 +107,7 @@ class Validator
             }
         }
 
-        if (!empty($this->errors)) {
+        if (! empty($this->errors)) {
             throw new ValidationException($this->getErrorMessage());
         }
 
@@ -122,6 +122,7 @@ class Validator
                 $messages[] = $error;
             }
         }
+
         return implode('; ', $messages);
     }
 
@@ -135,7 +136,7 @@ class Validator
     {
         $this->validationStates[$name] = [
             'validate' => $validator,
-            'message' => $message
+            'message' => $message,
         ];
     }
 }

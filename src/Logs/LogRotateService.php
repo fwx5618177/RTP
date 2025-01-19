@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Logs;
 
-use DateTime;
-use Exception;
 use App\Exceptions\LogRotateException;
 use App\Exceptions\MailNotificationException;
+use DateTime;
 
 class LogRotateService
 {
@@ -33,11 +32,12 @@ class LogRotateService
         $this->maxFiles = $maxFiles;
         $this->logger = Logger::getInstance('logrotate');
 
-        if (!is_dir($this->logDir)) {
+        if (! is_dir($this->logDir)) {
             if (mkdir($this->logDir, 0755, true)) {
                 $this->logger->info("Created log directory: {$this->logDir}");
             } else {
                 $this->logger->error("Failed to create log directory: {$this->logDir}");
+
                 throw new LogRotateException("Failed to create log directory: {$this->logDir}");
             }
         }
@@ -47,8 +47,9 @@ class LogRotateService
     {
         $logPath = "{$this->logDir}/{$this->logFile}";
 
-        if (!file_exists($logPath) || filesize($logPath) < $this->maxSize) {
+        if (! file_exists($logPath) || filesize($logPath) < $this->maxSize) {
             $this->logger->info("No rotation needed for log file: {$logPath}");
+
             return;
         }
 
@@ -63,8 +64,9 @@ class LogRotateService
         $timestamp = (new DateTime())->format('Ymd_His');
         $archivePath = "{$this->logDir}/{$this->logFile}.{$timestamp}.log";
 
-        if (!rename($logPath, $archivePath)) {
+        if (! rename($logPath, $archivePath)) {
             $this->logger->error("Failed to rotate log file: {$logPath}");
+
             throw new LogRotateException("Failed to rotate log file: {$logPath}");
         }
 
@@ -77,8 +79,9 @@ class LogRotateService
 
     private function compressLogFile(string $filePath): void
     {
-        if (!extension_loaded('zlib')) {
+        if (! extension_loaded('zlib')) {
             $this->logger->warning("Zlib extension not loaded, skipping compression");
+
             return;
         }
 
@@ -91,6 +94,7 @@ class LogRotateService
             unlink($filePath);
         } else {
             $this->logger->error("Failed to compress log file: {$filePath}");
+
             throw new LogRotateException("Failed to compress log file: {$filePath}");
         }
     }
@@ -126,6 +130,7 @@ class LogRotateService
     public function getLogFiles(): array
     {
         $pattern = "{$this->logDir}/{$this->logFile}*.log*";
+
         return glob($pattern) ?: [];
     }
 
@@ -152,6 +157,7 @@ EOL;
             chmod($configPath, 0644);
         } else {
             $this->logger->error("Failed to write logrotate config");
+
             throw new LogRotateException("Failed to write logrotate config");
         }
     }
@@ -167,7 +173,7 @@ EOL;
         }
 
         // 发送邮件通知
-        if (!empty($this->mailConfig)) {
+        if (! empty($this->mailConfig)) {
             try {
                 $this->sendMailNotification($message);
             } catch (\Exception $e) {
@@ -182,23 +188,26 @@ EOL;
 
         // 使用内置mail函数
         if ($this->mailConfig['driver'] === 'mail' && function_exists('mail')) {
-            if (!mail(
+            if (! mail(
                 $this->mailConfig['recipients'],
                 $subject,
                 $message,
                 $this->buildMailHeaders()
             )) {
                 $this->logger->error("Failed to send mail notification");
+
                 throw new MailNotificationException("Failed to send mail notification");
             }
             $this->logger->info("Mail notification sent successfully");
+
             return;
         }
 
         // 使用SMTP
         if ($this->mailConfig['driver'] === 'smtp') {
-            if (!class_exists('\Swift_SmtpTransport')) {
+            if (! class_exists('\Swift_SmtpTransport')) {
                 $this->logger->error("SwiftMailer not installed. Please run: composer require swiftmailer/swiftmailer");
+
                 throw new MailNotificationException("SwiftMailer not installed");
             }
 
@@ -218,26 +227,29 @@ EOL;
             try {
                 $mailer->send($swiftMessage);
                 $this->logger->info("Mail notification sent successfully via SMTP");
+
                 return;
             } catch (\Exception $e) {
                 $this->logger->error("Failed to send mail notification via SMTP: " . $e->getMessage());
+
                 throw new MailNotificationException("Failed to send mail notification via SMTP: " . $e->getMessage());
             }
         }
 
         // 使用AWS SES
         if ($this->mailConfig['driver'] === 'ses') {
-            if (!class_exists('\Aws\Ses\SesClient')) {
+            if (! class_exists('\Aws\Ses\SesClient')) {
                 $this->logger->error("AWS SDK not installed. Please run: composer require aws/aws-sdk-php");
+
                 throw new MailNotificationException("AWS SDK not installed");
             }
 
             try {
                 $client = new \Aws\Ses\SesClient([
                     'version' => 'latest',
-                    'region'  => $this->mailConfig['region'],
+                    'region' => $this->mailConfig['region'],
                     'credentials' => [
-                        'key'    => $this->mailConfig['key'],
+                        'key' => $this->mailConfig['key'],
                         'secret' => $this->mailConfig['secret'],
                     ],
                 ]);
@@ -263,6 +275,7 @@ EOL;
                 $this->logger->info("Mail notification sent successfully via SES");
             } catch (\Exception $e) {
                 $this->logger->error("Failed to send mail notification via SES: " . $e->getMessage());
+
                 throw new MailNotificationException("Failed to send mail notification via SES: " . $e->getMessage());
             }
         }
@@ -275,7 +288,7 @@ EOL;
             'Reply-To: ' . $this->mailConfig['from'],
             'X-Mailer: PHP/' . phpversion(),
             'MIME-Version: 1.0',
-            'Content-type: text/plain; charset=utf-8'
+            'Content-type: text/plain; charset=utf-8',
         ]);
     }
 }

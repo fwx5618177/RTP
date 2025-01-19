@@ -3,10 +3,10 @@
 namespace App\Entity;
 
 use App\Repository\UserRepository;
+use DateTime;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
-use DateTime;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'users')]
@@ -145,6 +145,7 @@ class UserEntity extends BaseEntity
     public function setId(int $id): self
     {
         $this->id = $id;
+
         return $this;
     }
 
@@ -161,6 +162,7 @@ class UserEntity extends BaseEntity
     public function setUsername(string $username): self
     {
         $this->username = $username;
+
         return $this;
     }
 
@@ -172,6 +174,7 @@ class UserEntity extends BaseEntity
     public function setEmail(string $email): self
     {
         $this->email = $email;
+
         return $this;
     }
 
@@ -183,6 +186,7 @@ class UserEntity extends BaseEntity
     public function setPasswordHash(string $passwordHash): self
     {
         $this->passwordHash = $passwordHash;
+
         return $this;
     }
 
@@ -194,6 +198,7 @@ class UserEntity extends BaseEntity
     public function setFirstName(?string $firstName): self
     {
         $this->firstName = $firstName;
+
         return $this;
     }
 
@@ -205,6 +210,7 @@ class UserEntity extends BaseEntity
     public function setLastName(?string $lastName): self
     {
         $this->lastName = $lastName;
+
         return $this;
     }
 
@@ -219,6 +225,7 @@ class UserEntity extends BaseEntity
             $phone = $this->encrypt($phone);
         }
         $this->phone = $phone;
+
         return $this;
     }
 
@@ -230,6 +237,7 @@ class UserEntity extends BaseEntity
     public function setAddress(?string $address): self
     {
         $this->address = $address;
+
         return $this;
     }
 
@@ -241,6 +249,7 @@ class UserEntity extends BaseEntity
     public function setAvatarUrl(?string $avatarUrl): self
     {
         $this->avatarUrl = $avatarUrl;
+
         return $this;
     }
 
@@ -252,6 +261,7 @@ class UserEntity extends BaseEntity
     public function setRole(string $role): self
     {
         $this->role = $role;
+
         return $this;
     }
 
@@ -263,6 +273,7 @@ class UserEntity extends BaseEntity
     public function setIsActive(bool $isActive): self
     {
         $this->isActive = $isActive;
+
         return $this;
     }
 
@@ -285,6 +296,7 @@ class UserEntity extends BaseEntity
     {
         $this->lastLoginAt = $lastLoginAt;
         $this->logOperation('logged_in');
+
         return $this;
     }
 
@@ -296,6 +308,7 @@ class UserEntity extends BaseEntity
     public function setEmailVerifiedAt(?DateTime $emailVerifiedAt): self
     {
         $this->emailVerifiedAt = $emailVerifiedAt;
+
         return $this;
     }
 
@@ -307,6 +320,7 @@ class UserEntity extends BaseEntity
     public function delete(): self
     {
         $this->handlePreDelete();
+
         return $this;
     }
 
@@ -315,6 +329,7 @@ class UserEntity extends BaseEntity
         $this->isActive = true;
         $this->deletedAt = null;
         $this->logOperation('restored');
+
         return $this;
     }
 
@@ -331,6 +346,7 @@ class UserEntity extends BaseEntity
     public function setRoles(array $roles): self
     {
         $this->roles = $roles;
+
         return $this;
     }
 
@@ -341,10 +357,11 @@ class UserEntity extends BaseEntity
 
     public function addRole(string $role): self
     {
-        if (!$this->hasRole($role)) {
+        if (! $this->hasRole($role)) {
             $this->roles[] = $role;
             $this->logOperation("role_added:$role");
         }
+
         return $this;
     }
 
@@ -355,6 +372,7 @@ class UserEntity extends BaseEntity
             $this->roles = array_values($this->roles);
             $this->logOperation("role_removed:$role");
         }
+
         return $this;
     }
 

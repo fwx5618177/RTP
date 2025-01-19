@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<ruleset name="RTP Bridge Backend">
+    <description>PHP CodeSniffer configuration for RTP Bridge Backend</description>
+    
+    <!-- Show progress -->
+    <arg value="p"/>
+    
+    <!-- Check all files in src and tests directories -->
+    <file>src</file>
+    <file>tests</file>
+    
+    <!-- Use PSR12 standard -->
+    <rule ref="PSR12"/>
+    
+    <!-- Exclude some directories -->
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/logs/*</exclude-pattern>
+</ruleset>

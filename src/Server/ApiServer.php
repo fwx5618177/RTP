@@ -9,9 +9,9 @@ use App\Http\Response;
 use App\Logs\Logger;
 use App\Routes\Router;
 use App\Utils\Container;
-use Swoole\Http\Server;
 use Swoole\Http\Request as SwooleRequest;
 use Swoole\Http\Response as SwooleResponse;
+use Swoole\Http\Server;
 
 class ApiServer
 {
@@ -56,7 +56,7 @@ class ApiServer
                 $errorResponse = new Response([
                     'error' => $e->getMessage(),
                     'code' => $statusCode,
-                    'success' => false
+                    'success' => false,
                 ], $statusCode);
 
                 $swooleResponse->status($statusCode);

@@ -38,38 +38,44 @@ class Response
     public function status(int $statusCode): self
     {
         $this->statusCode = $statusCode;
+
         return $this;
     }
 
     public function setStatusCode(int $statusCode): self
     {
         $this->statusCode = $statusCode;
+
         return $this;
     }
 
     public function body(array|string $body): self
     {
         $this->body = is_array($body) ? json_encode($body) : $body;
+
         return $this;
     }
 
     public function setBody(array|string $body): self
     {
         $this->body = is_array($body) ? json_encode($body) : $body;
+
         return $this;
     }
 
     public function header(string $name, string $value, bool $replace = true): self
     {
-        if ($replace || !isset($this->headers[$name])) {
+        if ($replace || ! isset($this->headers[$name])) {
             $this->headers[$name] = $value;
         }
+
         return $this;
     }
 
     public function setHeader(string $name, string $value): self
     {
         $this->headers[$name] = $value;
+
         return $this;
     }
 
@@ -92,7 +98,7 @@ class Response
         }
 
         // Add content length if not set
-        if (!isset($this->headers['Content-Length'])) {
+        if (! isset($this->headers['Content-Length'])) {
             $response .= "Content-Length: " . strlen($this->body) . "\r\n";
         }
 

@@ -2,12 +2,11 @@
 
 namespace App\Routes;
 
+use App\Exceptions\RouteNotFoundException;
 use App\Http\Request;
 use App\Http\Response;
-use App\Routes\Route;
-use App\Exceptions\RouteNotFoundException;
-use App\Middlewares\MiddlewareStack;
 use App\Middlewares\MiddlewareInterface;
+use App\Middlewares\MiddlewareStack;
 
 class Router
 {
@@ -17,6 +16,7 @@ class Router
     public function addGlobalMiddleware($middleware): self
     {
         $this->globalMiddlewares[] = $middleware;
+
         return $this;
     }
 
@@ -25,7 +25,7 @@ class Router
         $middlewares = $attributes['middleware'] ?? [];
         $prefix = $attributes['prefix'] ?? '';
 
-        $callback(new class($this, $middlewares, $prefix) {
+        $callback(new class ($this, $middlewares, $prefix) {
             private $router;
             private $middlewares;
             private $prefix;
@@ -75,7 +75,7 @@ class Router
             }
 
             // 添加最终的控制器处理
-            $middlewareStack->add(new class($route) implements MiddlewareInterface {
+            $middlewareStack->add(new class ($route) implements MiddlewareInterface {
                 private $route;
 
                 public function __construct($route)
@@ -101,6 +101,7 @@ class Router
     {
         $route = new Route($method, $path, $handler, $middlewares);
         $this->routes[] = $route;
+
         return $route;
     }
 }

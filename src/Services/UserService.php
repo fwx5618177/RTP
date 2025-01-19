@@ -4,11 +4,11 @@ namespace App\Services;
 
 use App\DTO\UserDTO;
 use App\Entity\UserEntity;
-use App\Repository\UserRepository;
 use App\Exceptions\ValidationException;
-use Doctrine\ORM\EntityManager;
 use App\Logs\Logger;
+use App\Repository\UserRepository;
 use App\Utils\Container;
+use Doctrine\ORM\EntityManager;
 
 class UserService extends BaseService
 {
@@ -27,6 +27,7 @@ class UserService extends BaseService
         $this->logger->info('Starting user registration', ['email' => $dto->getEmail()]);
 
         $this->entityManager->beginTransaction();
+
         try {
             // 检查唯一性
             if ($this->userRepository->findByEmail($dto->getEmail())) {
@@ -42,10 +43,12 @@ class UserService extends BaseService
             $this->entityManager->commit();
 
             $this->logger->info('User registered successfully', ['id' => $user->getId()]);
+
             return $user;
         } catch (\Exception $e) {
             $this->entityManager->rollback();
             $this->logger->error('User registration failed', ['error' => $e->getMessage()]);
+
             throw $e;
         }
     }
@@ -53,12 +56,14 @@ class UserService extends BaseService
     public function getUserById(int $id): ?UserEntity
     {
         $this->logger->debug('Fetching user by ID', ['id' => $id]);
+
         return $this->userRepository->find($id);
     }
 
     public function getUserByEmail(string $email): ?UserEntity
     {
         $this->logger->debug('Fetching user by email', ['email' => $email]);
+
         return $this->userRepository->findByEmail($email);
     }
 
@@ -67,6 +72,7 @@ class UserService extends BaseService
         $this->logger->info('Updating user', ['id' => $user->getId()]);
 
         $this->entityManager->beginTransaction();
+
         try {
             $this->entityManager->persist($user);
             $this->entityManager->flush();
@@ -76,6 +82,7 @@ class UserService extends BaseService
         } catch (\Exception $e) {
             $this->entityManager->rollback();
             $this->logger->error('User update failed', ['error' => $e->getMessage()]);
+
             throw $e;
         }
     }
@@ -85,9 +92,10 @@ class UserService extends BaseService
         $this->logger->info('Deleting user', ['id' => $id]);
 
         $this->entityManager->beginTransaction();
+
         try {
             $user = $this->getUserById($id);
-            if (!$user) {
+            if (! $user) {
                 throw new ValidationException('User not found');
             }
 
@@ -97,6 +105,7 @@ class UserService extends BaseService
         } catch (\Exception $e) {
             $this->entityManager->rollback();
             $this->logger->error('User deletion failed', ['error' => $e->getMessage()]);
+
             throw $e;
         }
     }
@@ -104,6 +113,7 @@ class UserService extends BaseService
     public function listUsers(int $page = 1, int $limit = 10): array
     {
         $this->logger->debug('Listing users', ['page' => $page, 'limit' => $limit]);
+
         return $this->userRepository->findAll($page, $limit);
     }
 
@@ -116,7 +126,7 @@ class UserService extends BaseService
     public function getUserProfile(int $id): ?array
     {
         $user = $this->userRepository->find($id);
-        if (!$user) {
+        if (! $user) {
             return null;
         }
 
@@ -126,7 +136,7 @@ class UserService extends BaseService
             'email' => $user->getEmail(),
             'fullName' => $user->getFirstName() . ' ' . $user->getLastName(),
             'isActive' => $user->isActive(),
-            'lastLogin' => $user->getLastLoginAt()?->format('Y-m-d H:i:s')
+            'lastLogin' => $user->getLastLoginAt()?->format('Y-m-d H:i:s'),
         ];
     }
 

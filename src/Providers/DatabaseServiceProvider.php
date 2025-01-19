@@ -2,9 +2,9 @@
 
 namespace App\Providers;
 
-use Doctrine\ORM\ORMSetup;
-use Doctrine\ORM\EntityManager;
 use Doctrine\DBAL\Types\Type;
+use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\ORMSetup;
 use Ramsey\Uuid\Doctrine\UuidType;
 
 class DatabaseServiceProvider
@@ -15,7 +15,7 @@ class DatabaseServiceProvider
     {
         if (self::$entityManager === null) {
             // 注册 UUID 类型
-            if (!Type::hasType('uuid')) {
+            if (! Type::hasType('uuid')) {
                 Type::addType('uuid', UuidType::class);
             }
 
@@ -33,7 +33,7 @@ class DatabaseServiceProvider
                 'dbname' => $appConfig->get('DB_NAME', 'rtp_bridge'),
                 'user' => $appConfig->get('DB_USER', 'root'),
                 'password' => $appConfig->get('DB_PASS', 'password'),
-                'charset' => 'utf8mb4'
+                'charset' => 'utf8mb4',
             ]);
 
             self::$entityManager = new EntityManager($conn, $config);

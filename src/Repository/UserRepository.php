@@ -3,8 +3,8 @@
 namespace App\Repository;
 
 use App\Entity\UserEntity;
-use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\QueryBuilder;
 
 class UserRepository extends EntityRepository

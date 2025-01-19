@@ -13,6 +13,7 @@ class MiddlewareStack
     public function add($middleware): self
     {
         $this->middlewares[] = $middleware;
+
         return $this;
     }
 
@@ -20,12 +21,12 @@ class MiddlewareStack
     {
         // 这个方法是为了兼容旧代码，实际使用 process 方法
         $result = $this->process($request, $response);
-        
+
         // 如果是中间件返回的响应，包装成特定格式
         if ($result instanceof Response) {
             return [
                 'type' => 'response',
-                'response' => $result
+                'response' => $result,
             ];
         }
 
@@ -33,7 +34,7 @@ class MiddlewareStack
         return [
             'type' => 'continue',
             'request' => $request,
-            'response' => $response
+            'response' => $response,
         ];
     }
 

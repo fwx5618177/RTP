@@ -11,7 +11,7 @@ class TestFlowMiddleware implements MiddlewareInterface
     public function process(Request $request, Response $response, callable $next): Response
     {
         $logger = Logger::getInstance('middleware');
-        
+
         // 前置处理
         $logger->info('TestFlowMiddleware: Before next');
         $response->header('x-flow-middleware', 'before');
@@ -22,7 +22,7 @@ class TestFlowMiddleware implements MiddlewareInterface
         // 后置处理
         $logger->info('TestFlowMiddleware: After next');
         $response->header('x-flow-middleware', 'after');
-        
+
         return $response;
     }
-} 
+}

@@ -12,8 +12,8 @@ use App\Logs\LogRotateService;
 use App\Providers\DatabaseServiceProvider;
 use App\Server\ApiServer;
 use App\Utils\Container;
-use Doctrine\ORM\EntityManager;
 use DI\ContainerBuilder;
+use Doctrine\ORM\EntityManager;
 
 try {
     // 初始化 Config 实例
@@ -28,7 +28,7 @@ try {
     // 记录启动信息
     $logger->info('Initializing application...', [
         'environment' => $config->get('APP_ENV'),
-        'log_dir' => $logDir
+        'log_dir' => $logDir,
     ]);
 
     // 初始化日志轮转服务
@@ -78,7 +78,7 @@ try {
 
     // 主应用循环
     $logger->info('Application started', [
-        'environment' => $config->get('APP_ENV', 'production')
+        'environment' => $config->get('APP_ENV', 'production'),
     ]);
 
     pcntl_async_signals(true);
@@ -94,7 +94,7 @@ try {
             'message' => $e->getMessage(),
             'file' => $e->getFile(),
             'line' => $e->getLine(),
-            'trace' => $e->getTraceAsString()
+            'trace' => $e->getTraceAsString(),
         ]);
     } else {
         error_log('CRITICAL: ' . $e->getMessage());
