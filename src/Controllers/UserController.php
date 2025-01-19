@@ -59,7 +59,7 @@ class UserController extends BaseController
             ]);
 
             // 获取请求体
-            $requestBody = json_decode(file_get_contents('php://input'), true) ?? [];
+            $requestBody = $request->getBodyParams();
 
             $this->logger->info('Parsed request body', ['data' => $requestBody]);
 
