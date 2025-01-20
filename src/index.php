@@ -11,6 +11,7 @@ use App\Logs\Logger;
 use App\Logs\LogRotateService;
 use App\Providers\DatabaseServiceProvider;
 use App\Server\ApiServer;
+use App\Server\WebSocketServer;
 use App\Utils\Container;
 use DI\ContainerBuilder;
 use Doctrine\ORM\EntityManager;
@@ -71,22 +72,52 @@ try {
     // 设置全局容器实例
     Container::setInstance($container);
 
-    // 初始化API服务器
-    $apiServer = new ApiServer();
+    // 在新进程中启动 WebSocket 服务器
+    $pid = pcntl_fork();
+    if ($pid == 0) {
+        // 子进程运行 WebSocket 服务器
+        try {
+            // 启动 WebSocket 服务器
+            $wsServer = new WebSocketServer();
 
-    $apiServer->run((int)$config->get('APP_PORT'));
-
-    // 主应用循环
-    $logger->info('Application started', [
-        'environment' => $config->get('APP_ENV', 'production'),
-    ]);
-
-    pcntl_async_signals(true);
-    pcntl_signal(SIGINT, function () use ($logger) {
-        $logger->info("\n🛑 Received shutdown signal");
-        $logger->info('✅ Application stopped gracefully');
+            $wsServer->start();
+        } catch (\Exception $e) {
+            $logger->error('WebSocket Server Error: ' . $e->getMessage());
+            exit(1);
+        }
         exit(0);
-    });
+    } elseif ($pid > 0) {
+        // 父进程继续运行 API 服务器
+        $logger->info('WebSocket server started in background (PID: ' . $pid . ')');
+
+        // 初始化API服务器
+        $apiServer = new ApiServer();
+        $apiServer->run((int)$config->get('APP_PORT'));
+
+        // 主应用循环
+        $logger->info('Application started', [
+            'environment' => $config->get('APP_ENV', 'production'),
+        ]);
+
+        // 处理信号
+        pcntl_async_signals(true);
+        pcntl_signal(SIGINT, function () use ($logger, $pid) {
+            $logger->info("\n🛑 Received shutdown signal");
+
+            // 终止 WebSocket 服务器进程
+            posix_kill($pid, SIGTERM);
+            pcntl_waitpid($pid, $status);
+
+            $logger->info('✅ Application stopped gracefully');
+            exit(0);
+        });
+
+        while (true) {
+            sleep(1);
+        }
+    } else {
+        throw new \RuntimeException('Failed to fork process for WebSocket server');
+    }
 } catch (\Throwable $e) {
     // 初始化失败处理
     if (isset($logger)) {

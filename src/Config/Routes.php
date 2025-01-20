@@ -7,6 +7,7 @@ namespace App\Config;
 use App\Controllers\HomeController;
 use App\Controllers\UserController;
 use App\Controllers\RedisController;
+use App\Controllers\WebSocketController;
 use App\Middlewares\TestConditionMiddleware;
 use App\Middlewares\TestFlowMiddleware;
 use App\Routes\Router;
@@ -45,5 +46,13 @@ return function (Router $router) {
         $route->add('GET', '/get/{key}', [RedisController::class, 'get']);
         $route->add('GET', '/exists/{key}', [RedisController::class, 'exists']);
         $route->add('DELETE', '/delete/{key}', [RedisController::class, 'delete']);
+    });
+
+    // WebSocket 路由组
+    $router->group([
+        'prefix' => '/api/ws',
+        'middleware' => [new TestConditionMiddleware()],
+    ], function ($route) {
+        $route->add('GET', '/connect', [WebSocketController::class, 'connect']);
     });
 };

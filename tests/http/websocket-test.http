@@ -1,0 +1,23 @@
+###############################################
+# WebSocket 连接和消息测试
+###############################################
+
+### 1. 获取 WebSocket 连接信息
+GET http://localhost:9501/api/ws/connect?token=test_token_123
+Content-Type: application/json
+
+### 2. 获取连接信息(带客户端ID)
+GET http://localhost:9501/api/ws/connect?token=test_token_123&client_id=test_client_001
+Content-Type: application/json
+
+### 3. 获取连接信息(带额外参数)
+GET http://localhost:9501/api/ws/connect?token=test_token_123&client_id=test_client_002&room=room_001&user_type=admin
+Content-Type: application/json
+
+### 4. 无效 Token 测试
+GET http://localhost:9501/api/ws/connect
+Content-Type: application/json
+
+### 5. 无效 Token 值测试
+GET http://localhost:9501/api/ws/connect?token=invalid_token
+Content-Type: application/json 
