@@ -2,14 +2,19 @@
 
 namespace App\Providers;
 
+use App\Config\Config;
+use App\Logs\Logger;
+use App\Utils\Container;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\ORMSetup;
 use Ramsey\Uuid\Doctrine\UuidType;
+use Predis\Client as RedisClient;
 
 class DatabaseServiceProvider
 {
     private static ?EntityManager $entityManager = null;
+    private static ?\Predis\Client $redis = null;
 
     public static function getEntityManager(): EntityManager
     {
@@ -44,5 +49,45 @@ class DatabaseServiceProvider
         }
 
         return self::$entityManager;
+    }
+
+    public static function getRedis(): RedisClient
+    {
+        if (self::$redis === null) {
+            $appConfig = \App\Config\Config::getInstance();
+            $logger = \App\Logs\Logger::getInstance('redis');
+
+            try {
+                $parameters = [
+                    'scheme' => $appConfig->get('REDIS_SCHEME', 'tcp'),
+                    'host' => $appConfig->get('REDIS_HOST', '127.0.0.1'),
+                    'port' => (int) $appConfig->get('REDIS_PORT', 6379),
+                    'database' => (int) $appConfig->get('REDIS_DATABASE', 0),
+                    'read_write_timeout' => (float) $appConfig->get('REDIS_READ_WRITE_TIMEOUT', 2.0),
+                    'persistent' => (bool) $appConfig->get('REDIS_PERSISTENT', true),
+                ];
+
+                $options = [
+                    'prefix' => $appConfig->get('REDIS_PREFIX', 'rtp:'),
+                    'exceptions' => true,
+                ];
+
+                $password = $appConfig->get('REDIS_PASSWORD');
+                if ($password && $password !== 'null') {
+                    $parameters['password'] = $password;
+                }
+
+                self::$redis = new RedisClient($parameters, $options);
+
+                // Test connection
+                self::$redis->ping();
+                $logger->info('Redis connection established successfully');
+            } catch (\Exception $e) {
+                $logger->error('Redis connection error: ' . $e->getMessage());
+                throw $e;
+            }
+        }
+
+        return self::$redis;
     }
 }

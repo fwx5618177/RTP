@@ -6,6 +6,7 @@ namespace App\Config;
 
 use App\Controllers\HomeController;
 use App\Controllers\UserController;
+use App\Controllers\RedisController;
 use App\Middlewares\TestConditionMiddleware;
 use App\Middlewares\TestFlowMiddleware;
 use App\Routes\Router;
@@ -34,5 +35,15 @@ return function (Router $router) {
         $route->add('GET', '/{id}', [UserController::class, 'get']);
         $route->add('PUT', '/{id}', [UserController::class, 'update']);
         $route->add('DELETE', '/{id}', [UserController::class, 'delete']);
+    });
+
+    $router->group([
+        'prefix' => '/api/redis',
+        'middleware' => [new TestConditionMiddleware()],
+    ], function ($route) {
+        $route->add('POST', '/set', [RedisController::class, 'set']);
+        $route->add('GET', '/get/{key}', [RedisController::class, 'get']);
+        $route->add('GET', '/exists/{key}', [RedisController::class, 'exists']);
+        $route->add('DELETE', '/delete/{key}', [RedisController::class, 'delete']);
     });
 };

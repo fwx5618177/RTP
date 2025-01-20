@@ -1,0 +1,44 @@
+###############################################
+# Redis API 测试
+###############################################
+
+### 1. 设置键值对
+POST http://localhost:9501/api/redis/set
+Content-Type: application/json
+
+{
+    "key": "test:key1",
+    "value": "Hello Redis",
+    "ttl": 3600
+}
+
+### 2. 获取值
+GET http://localhost:9501/api/redis/get/test:key1
+Content-Type: application/json
+
+### 3. 检查键是否存在
+GET http://localhost:9501/api/redis/exists/test:key1
+Content-Type: application/json
+
+### 4. 删除键
+DELETE http://localhost:9501/api/redis/delete/test:key1
+Content-Type: application/json
+
+### 5. 设置复杂数据结构
+POST http://localhost:9501/api/redis/set
+Content-Type: application/json
+
+{
+    "key": "user:1",
+    "value": {
+        "id": 1,
+        "name": "John Doe",
+        "email": "john@example.com",
+        "created_at": "2024-01-01T00:00:00Z"
+    },
+    "ttl": 7200
+}
+
+### 6. 获取复杂数据结构
+GET http://localhost:9501/api/redis/get/user:1
+Content-Type: application/json 
