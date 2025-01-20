@@ -2,14 +2,11 @@
 
 namespace App\Providers;
 
-use App\Config\Config;
-use App\Logs\Logger;
-use App\Utils\Container;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\ORMSetup;
-use Ramsey\Uuid\Doctrine\UuidType;
 use Predis\Client as RedisClient;
+use Ramsey\Uuid\Doctrine\UuidType;
 
 class DatabaseServiceProvider
 {
@@ -84,6 +81,7 @@ class DatabaseServiceProvider
                 $logger->info('Redis connection established successfully');
             } catch (\Exception $e) {
                 $logger->error('Redis connection error: ' . $e->getMessage());
+
                 throw $e;
             }
         }

@@ -2,11 +2,11 @@
 
 namespace App\Controllers;
 
+use App\Exceptions\ValidationException;
 use App\Http\Request;
 use App\Http\Response;
 use App\Services\WebSocketService;
 use Psr\Container\ContainerInterface;
-use App\Exceptions\ValidationException;
 
 class WebSocketController extends BaseController
 {
@@ -23,7 +23,7 @@ class WebSocketController extends BaseController
         $token = $request->getQueryParams()['token'] ?? null;
         $clientId = $request->getQueryParams()['client_id'] ?? null;
 
-        if (!$token) {
+        if (! $token) {
             return $this->errorResponse('Token is required', 401);
         }
 
@@ -47,7 +47,7 @@ class WebSocketController extends BaseController
                 'websocket_url' => $connectionInfo['websocket_url'],
                 'token' => $token,
                 'handshake' => $handshake,
-                'timestamp' => time()
+                'timestamp' => time(),
             ]);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422);
@@ -65,12 +65,12 @@ class WebSocketController extends BaseController
             array_flip(['token', 'client_id'])
         );
 
-        if (!$token) {
+        if (! $token) {
             throw new ValidationException('Token is required');
         }
 
         // 验证 token
-        if (!$this->wsService->validateToken($token)) {
+        if (! $this->wsService->validateToken($token)) {
             throw new ValidationException('Invalid token');
         }
 
@@ -79,7 +79,7 @@ class WebSocketController extends BaseController
             'client_id' => $clientId,
             'extra_params' => $extraParams,
             'connection_id' => uniqid('ws_', true),
-            'timestamp' => time()
+            'timestamp' => time(),
         ];
     }
 }

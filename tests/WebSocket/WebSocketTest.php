@@ -2,13 +2,13 @@
 
 namespace Tests\WebSocket;
 
-use App\Services\WebSocketService;
-use PHPUnit\Framework\TestCase;
 use App\Config\Config;
 use App\Logs\Logger;
+use App\Services\WebSocketService;
 use GuzzleHttp\Client as HttpClient;
-use Swoole\Coroutine\Http\Client as SwooleClient;
+use PHPUnit\Framework\TestCase;
 use Swoole\Coroutine;
+use Swoole\Coroutine\Http\Client as SwooleClient;
 
 class WebSocketTest extends TestCase
 {
@@ -39,7 +39,7 @@ class WebSocketTest extends TestCase
 
         $this->logger->info('WebSocket Test Setup', [
             'host' => $this->wsHost,
-            'port' => $this->wsPort
+            'port' => $this->wsPort,
         ]);
     }
 
@@ -50,7 +50,7 @@ class WebSocketTest extends TestCase
             try {
                 // 1. 获取连接信息
                 $response = $this->httpClient->get('/api/ws/connect', [
-                    'query' => ['token' => 'test_token_123']
+                    'query' => ['token' => 'test_token_123'],
                 ]);
 
                 $connectionInfo = json_decode($response->getBody()->getContents(), true);
@@ -71,12 +71,12 @@ class WebSocketTest extends TestCase
                     'X-Handshake-Token' => $connectionInfo['data']['token'],
                     'X-Handshake-Timestamp' => (string)$handshake['timestamp'],
                     'X-Handshake-Signature' => $handshake['signature'],
-                    'User-Agent' => 'WebSocket-Test-Client'
+                    'User-Agent' => 'WebSocket-Test-Client',
                 ]);
 
                 $this->logger->debug('Connecting to WebSocket', [
                     'url' => $connectionInfo['data']['websocket_url'],
-                    'headers' => $client->requestHeaders
+                    'headers' => $client->requestHeaders,
                 ]);
 
                 // 5. 升级连接到 WebSocket
@@ -100,8 +100,9 @@ class WebSocketTest extends TestCase
             } catch (\Exception $e) {
                 $this->logger->error('WebSocket test failed', [
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
+                    'trace' => $e->getTraceAsString(),
                 ]);
+
                 throw $e;
             }
         });
@@ -119,11 +120,11 @@ class WebSocketTest extends TestCase
             $invalidClient = new SwooleClient($this->wsHost, $this->wsPort);
             $invalidClient->setHeaders([
                 'X-Connection-Id' => 'invalid_id',
-                'X-Handshake-Token' => 'test_token_123'
+                'X-Handshake-Token' => 'test_token_123',
             ]);
 
             $this->logger->debug('Attempting connection with invalid ID', [
-                'url' => "ws://{$this->wsHost}:{$this->wsPort}/ws/invalid_id"
+                'url' => "ws://{$this->wsHost}:{$this->wsPort}/ws/invalid_id",
             ]);
 
             $result = $invalidClient->upgrade('/ws/invalid_id');
@@ -137,11 +138,11 @@ class WebSocketTest extends TestCase
                 'X-Connection-Id' => $connectionId,
                 'X-Handshake-Token' => 'invalid_token',
                 'X-Handshake-Timestamp' => (string)time(),
-                'X-Handshake-Signature' => 'invalid_signature'
+                'X-Handshake-Signature' => 'invalid_signature',
             ]);
 
             $this->logger->debug('Attempting connection with invalid handshake', [
-                'url' => $wsUrl
+                'url' => $wsUrl,
             ]);
 
             $result = $invalidHandshakeClient->upgrade('/ws/' . $connectionId);

@@ -5,9 +5,9 @@ namespace App\Server;
 use App\Config\Config;
 use App\Logs\Logger;
 use App\Services\WebSocketService;
-use Swoole\WebSocket\Server;
 use Swoole\Http\Request;
 use Swoole\WebSocket\Frame;
+use Swoole\WebSocket\Server;
 
 class WebSocketServer
 {
@@ -52,7 +52,7 @@ class WebSocketServer
     {
         $this->logger->info('WebSocket handshake request', [
             'headers' => $request->header,
-            'path' => $request->server['request_uri']
+            'path' => $request->server['request_uri'],
         ]);
 
         try {
@@ -61,11 +61,12 @@ class WebSocketServer
                 'connection_id' => $request->header['x-connection-id'] ?? '',
                 'token' => $request->header['x-handshake-token'] ?? '',
                 'timestamp' => $request->header['x-handshake-timestamp'] ?? '',
-                'signature' => $request->header['x-handshake-signature'] ?? ''
+                'signature' => $request->header['x-handshake-signature'] ?? '',
             ];
 
-            if (!$this->wsService->validateHandshake($handshakeData)) {
+            if (! $this->wsService->validateHandshake($handshakeData)) {
                 $this->logger->warning('Invalid handshake', $handshakeData);
+
                 return false;
             }
 
@@ -83,22 +84,24 @@ class WebSocketServer
             }
 
             // 准备连接
-            if (!$this->prepareConnection($request)) {
+            if (! $this->prepareConnection($request)) {
                 $this->logger->error('Failed to prepare connection');
+
                 return false;
             }
 
             $this->logger->info('Handshake successful', [
                 'connection_id' => $handshakeData['connection_id'],
-                'fd' => $request->fd
+                'fd' => $request->fd,
             ]);
 
             return true;
         } catch (\Exception $e) {
             $this->logger->error('Handshake error', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return false;
         }
     }
@@ -107,7 +110,7 @@ class WebSocketServer
     {
         $this->logger->info('New WebSocket connection', [
             'fd' => $request->fd,
-            'headers' => $request->header
+            'headers' => $request->header,
         ]);
     }
 
@@ -115,13 +118,14 @@ class WebSocketServer
     {
         $this->logger->info('Received message', [
             'fd' => $frame->fd,
-            'data' => $frame->data
+            'data' => $frame->data,
         ]);
 
         try {
             // 处理 ping 消息
             if (strtolower($frame->data) === 'ping') {
                 $server->push($frame->fd, 'pong');
+
                 return;
             }
 
@@ -130,7 +134,7 @@ class WebSocketServer
             if (json_last_error() === JSON_ERROR_NONE) {
                 $response = [
                     'type' => $data['type'] ?? 'unknown',
-                    'data' => $data['data'] ?? []
+                    'data' => $data['data'] ?? [],
                 ];
                 $server->push($frame->fd, json_encode($response));
             } else {
@@ -140,12 +144,12 @@ class WebSocketServer
         } catch (\Exception $e) {
             $this->logger->error('Error processing message', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             $server->push($frame->fd, json_encode([
                 'type' => 'error',
-                'message' => 'Internal server error'
+                'message' => 'Internal server error',
             ]));
         }
     }
@@ -172,14 +176,16 @@ class WebSocketServer
             // 从 header 中获取 token
             $token = $request->header['x-handshake-token'] ?? null;
 
-            if (!$token) {
+            if (! $token) {
                 $this->logger->warning('WebSocket connection attempt without token');
+
                 return false;
             }
 
             // 验证 token
-            if (!$this->wsService->validateToken($token)) {
+            if (! $this->wsService->validateToken($token)) {
                 $this->logger->warning('Invalid WebSocket token', ['token' => $token]);
+
                 return false;
             }
 
@@ -189,7 +195,7 @@ class WebSocketServer
                 'connection_id' => $request->header['x-connection-id'] ?? null,
                 'ip' => $request->server['remote_addr'],
                 'user_agent' => $request->header['user-agent'] ?? 'unknown',
-                'connected_at' => time()
+                'connected_at' => time(),
             ];
 
             // 存储连接信息
@@ -197,15 +203,16 @@ class WebSocketServer
 
             $this->logger->info('WebSocket connection prepared', [
                 'fd' => $request->fd,
-                'connection_id' => $connectionInfo['connection_id']
+                'connection_id' => $connectionInfo['connection_id'],
             ]);
 
             return true;
         } catch (\Exception $e) {
             $this->logger->error('Error preparing WebSocket connection', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return false;
         }
     }

@@ -36,7 +36,7 @@ class ValidatorTest extends TestCase
     {
         $this->validator->addValidationRule(
             'phone',
-            fn($value) => preg_match('/^1[3-9]\d{9}$/', $value),
+            fn ($value) => preg_match('/^1[3-9]\d{9}$/', $value),
             'The {field} must be a valid phone number'
         );
 
@@ -154,7 +154,7 @@ class ValidatorTest extends TestCase
         // 添加自定义验证规则
         $this->validator->addValidationRule(
             'startsWith',
-            fn($value, $params) => str_starts_with($value, $params[0]),
+            fn ($value, $params) => str_starts_with($value, $params[0]),
             'The {field} must start with {param}'
         );
 
@@ -175,14 +175,14 @@ class ValidatorTest extends TestCase
         // 添加手机号验证规则
         $this->validator->addValidationRule(
             'phone',
-            fn($value) => preg_match('/^1[3-9]\d{9}$/', $value),
+            fn ($value) => preg_match('/^1[3-9]\d{9}$/', $value),
             'The {field} must be a valid phone number'
         );
 
         // 添加邮编验证规则
         $this->validator->addValidationRule(
             'postcode',
-            fn($value) => preg_match('/^\d{6}$/', $value),
+            fn ($value) => preg_match('/^\d{6}$/', $value),
             'The {field} must be a valid post code'
         );
 
@@ -212,7 +212,7 @@ class ValidatorTest extends TestCase
     {
         $this->validator->addValidationRule(
             'url',
-            fn($value) => filter_var($value, FILTER_VALIDATE_URL),
+            fn ($value) => filter_var($value, FILTER_VALIDATE_URL),
             'The {field} must be a valid URL'
         );
 

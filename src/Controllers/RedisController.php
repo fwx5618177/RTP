@@ -21,20 +21,20 @@ class RedisController extends BaseController
     {
         $data = $request->getBodyParams();
 
-        if (empty($data['key']) || !isset($data['value'])) {
+        if (empty($data['key']) || ! isset($data['value'])) {
             return $this->errorResponse('Key and value are required');
         }
 
         $ttl = $data['ttl'] ?? null;
         $result = $this->redisService->set($data['key'], $data['value'], $ttl);
 
-        if (!$result) {
+        if (! $result) {
             return $this->errorResponse('Failed to set Redis key');
         }
 
         return $this->successResponse([
             'message' => 'Successfully set Redis key',
-            'key' => $data['key']
+            'key' => $data['key'],
         ]);
     }
 
@@ -48,7 +48,7 @@ class RedisController extends BaseController
 
         return $this->successResponse([
             'key' => $key,
-            'value' => $value
+            'value' => $value,
         ]);
     }
 
@@ -58,7 +58,7 @@ class RedisController extends BaseController
 
         return $this->successResponse([
             'key' => $key,
-            'exists' => $exists
+            'exists' => $exists,
         ]);
     }
 
@@ -66,13 +66,13 @@ class RedisController extends BaseController
     {
         $result = $this->redisService->delete($key);
 
-        if (!$result) {
+        if (! $result) {
             return $this->errorResponse('Failed to delete key or key not found');
         }
 
         return $this->successResponse([
             'message' => 'Successfully deleted key',
-            'key' => $key
+            'key' => $key,
         ]);
     }
 }

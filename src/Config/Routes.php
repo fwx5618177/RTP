@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Config;
 
 use App\Controllers\HomeController;
-use App\Controllers\UserController;
 use App\Controllers\RedisController;
+use App\Controllers\UserController;
 use App\Controllers\WebSocketController;
 use App\Middlewares\TestConditionMiddleware;
 use App\Middlewares\TestFlowMiddleware;

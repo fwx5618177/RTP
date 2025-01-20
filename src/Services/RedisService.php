@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Providers\DatabaseServiceProvider;
 use App\Logs\Logger;
+use App\Providers\DatabaseServiceProvider;
 use Predis\Client as RedisClient;
 
 class RedisService
@@ -26,12 +26,14 @@ class RedisService
                 $this->redis->set($key, $this->serialize($value));
             }
             $this->logger->info('Successfully set key in Redis', ['key' => $key]);
+
             return true;
         } catch (\Exception $e) {
             $this->logger->error('Failed to set key in Redis', [
                 'key' => $key,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -43,12 +45,14 @@ class RedisService
             if ($value === null) {
                 return null;
             }
+
             return $this->unserialize($value);
         } catch (\Exception $e) {
             $this->logger->error('Failed to get key from Redis', [
                 'key' => $key,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -58,12 +62,14 @@ class RedisService
         try {
             $result = $this->redis->del([$key]);
             $this->logger->info('Successfully deleted key from Redis', ['key' => $key]);
+
             return $result > 0;
         } catch (\Exception $e) {
             $this->logger->error('Failed to delete key from Redis', [
                 'key' => $key,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -75,8 +81,9 @@ class RedisService
         } catch (\Exception $e) {
             $this->logger->error('Failed to check key existence in Redis', [
                 'key' => $key,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
