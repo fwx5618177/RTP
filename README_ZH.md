@@ -15,6 +15,111 @@
 
 RTP 是一个高性能的实时传输协议桥接后端，基于 PHP 和 Swoole 构建，旨在提供稳定、高效的实时数据传输服务。
 
+## WebSocket 集成
+
+项目现已包含 WebSocket 服务器实现，具有以下功能：
+
+- **实时双向通信**：支持服务器与客户端之间的实时数据交换
+- **高性能**：基于 Swoole 的事件驱动架构
+- **可扩展**：支持最多 1000 个并发连接
+- **安全**：基于 Token 的 WebSocket 连接认证
+- **与 API 服务器集成**：与 HTTP API 服务器并行运行
+
+### WebSocket 配置
+
+WebSocket 服务器可通过 .env 文件配置：
+
+```env
+# WebSocket 配置
+WS_PORT=9502
+WS_HOST=127.0.0.1
+WS_PATH=/ws
+WS_MAX_CONNECTIONS=1000
+WS_TOKEN=test_token_123
+```
+
+### WebSocket 使用
+
+1. 启动 WebSocket 服务器：
+
+```bash
+php src/index.php
+```
+
+2. 连接 WebSocket 服务器：
+
+```javascript
+const ws = new WebSocket("ws://127.0.0.1:9502/ws");
+
+ws.onopen = () => {
+  console.log("已连接到 WebSocket 服务器");
+  ws.send(
+    JSON.stringify({
+      token: "test_token_123",
+      action: "subscribe",
+      channel: "updates",
+    })
+  );
+};
+
+ws.onmessage = (message) => {
+  console.log("收到消息:", message.data);
+};
+```
+
+3. 从服务器发送消息：
+
+```php
+$wsServer->sendToAll(json_encode([
+  'event' => 'update',
+  'data' => $payload
+]));
+```
+
+4. 处理客户端消息：
+
+```php
+$wsServer->on('message', function($frame) {
+  // 处理收到的消息
+  $data = json_decode($frame->data, true);
+
+  // 处理不同操作
+  switch ($data['action']) {
+    case 'subscribe':
+      // 将客户端添加到频道
+      break;
+    case 'unsubscribe':
+      // 从频道移除客户端
+      break;
+    case 'message':
+      // 向频道广播消息
+      break;
+  }
+});
+```
+
+### 测试 WebSocket
+
+可以使用提供的测试文件测试 WebSocket 功能：
+
+```bash
+php tests/WebSocket/WebSocketTest.php
+```
+
+或使用 .http 测试文件：
+
+```http
+### WebSocket 测试
+WEBSOCKET ws://127.0.0.1:9502/ws
+Content-Type: application/json
+
+{
+  "token": "test_token_123",
+  "action": "subscribe",
+  "channel": "updates"
+}
+```
+
 ## 语言选择
 
 本项目提供以下语言版本：
@@ -25,7 +130,9 @@ RTP 是一个高性能的实时传输协议桥接后端，基于 PHP 和 Swoole 
 
 ## 项目架构
 
-本项目采用分层架构设计，主要流程如下：
+本项目采用分层架构设计，包含HTTP API和WebSocket双通道：
+
+### HTTP API 流程
 
 1. Client -> Route: 客户端请求首先进入路由层
 2. Route -> Middleware: 路由层根据请求路径匹配中间件
@@ -36,6 +143,18 @@ RTP 是一个高性能的实时传输协议桥接后端，基于 PHP 和 Swoole 
 7. Service -> Entity: 业务服务层操作实体对象
 8. Entity -> Repository: 实体对象通过仓储层持久化
 9. Repository -> DB: 最终数据存储到数据库
+
+### WebSocket 流程
+
+1. Client -> WebSocket Server: 客户端建立WebSocket连接
+2. WebSocket Server -> Auth Middleware: 连接认证
+3. Auth Middleware -> Message Handler: 消息处理
+4. Message Handler -> Service: 调用业务服务
+5. Service -> Entity: 业务服务层操作实体对象
+6. Entity -> Repository: 实体对象通过仓储层持久化
+7. Repository -> DB: 最终数据存储到数据库
+8. Service -> Message Handler: 返回处理结果
+9. Message Handler -> Client: 推送消息给客户端
 
 ### 架构使用方法
 
@@ -87,6 +206,16 @@ RTP 是一个高性能的实时传输协议桥接后端，基于 PHP 和 Swoole 
 - [ ] 添加事件驱动机制
 - [ ] 实现领域事件
 
+### WebSocket 改进
+
+- [ ] 实现消息广播机制
+- [ ] 添加消息持久化支持
+- [ ] 实现消息重试机制
+- [ ] 添加连接负载均衡
+- [ ] 实现消息压缩
+- [ ] 添加消息优先级处理
+- [ ] 实现消息签名验证
+
 ### 基础设施
 
 - [ ] 添加消息队列支持（RabbitMQ/Kafka）
@@ -104,6 +233,8 @@ RTP 是一个高性能的实时传输协议桥接后端，基于 PHP 和 Swoole 
 - [ ] 添加性能测试
 - [ ] 实现混沌工程测试
 - [ ] 添加安全测试
+- [ ] 添加WebSocket压力测试
+- [ ] 实现WebSocket消息一致性测试
 
 ### 当前未实现功能
 
@@ -117,6 +248,8 @@ RTP 是一个高性能的实时传输协议桥接后端，基于 PHP 和 Swoole 
 - [ ] 第三方登录集成
 - [ ] API 文档自动生成
 - [ ] 数据迁移工具
+- [ ] WebSocket消息审计功能
+- [ ] WebSocket连接监控面板
 
 ## 项目结构
 
@@ -159,8 +292,10 @@ RTP 是一个高性能的实时传输协议桥接后端，基于 PHP 和 Swoole 
 │   │   ├── Route.php     # 路由类
 │   │   └── Router.php    # 路由器
 │   ├── Server/           # 服务器配置
-│   │   └── ApiServer.php # API服务器
+│   │   ├── ApiServer.php # API服务器
+│   │   └── WebSocketServer.php # WebSocket服务器
 │   ├── Services/         # 业务逻辑
+│   │   └── WebSocketService.php # WebSocket服务
 │   ├── Utils/            # 工具类
 │   │   └── Container.php # 依赖注入容器
 │   └── Validator/        # 数据验证
@@ -169,6 +304,8 @@ RTP 是一个高性能的实时传输协议桥接后端，基于 PHP 和 Swoole 
 │   ├── http/             # HTTP API测试
 │   │   ├── middleware-api.http # 中间件API测试
 │   │   └── user-api.http       # 用户API测试
+│   ├── WebSocket/        # WebSocket测试
+│   │   └── WebSocketTest.php # WebSocket测试用例
 │   └── Validator/        # 验证器测试
 │       └── ValidatorTest.php
 └── README.md             # 项目说明

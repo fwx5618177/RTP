@@ -15,6 +15,111 @@
 
 RTPは、PHPとSwooleをベースにした高性能なリアルタイム転送プロトコルブリッジバックエンドで、安定した効率的なリアルタイムデータ転送サービスを提供することを目的としています。
 
+## WebSocket統合
+
+本プロジェクトには以下の機能を備えたWebSocketサーバー実装が含まれています：
+
+- **リアルタイム双方向通信**: サーバーとクライアント間のリアルタイムデータ交換を可能にします
+- **高性能**: Swooleのイベント駆動型アーキテクチャを基盤としています
+- **スケーラブル**: 最大1000同時接続をサポート
+- **セキュア**: WebSocket接続のためのトークンベース認証
+- **APIサーバーとの統合**: HTTP APIサーバーと並行して動作
+
+### WebSocket設定
+
+WebSocketサーバーは.envファイルで設定可能です：
+
+```env
+# WebSocket設定
+WS_PORT=9502
+WS_HOST=127.0.0.1
+WS_PATH=/ws
+WS_MAX_CONNECTIONS=1000
+WS_TOKEN=test_token_123
+```
+
+### WebSocket使用方法
+
+1. WebSocketサーバーを起動：
+
+```bash
+php src/index.php
+```
+
+2. WebSocketサーバーに接続：
+
+```javascript
+const ws = new WebSocket("ws://127.0.0.1:9502/ws");
+
+ws.onopen = () => {
+  console.log("WebSocketサーバーに接続しました");
+  ws.send(
+    JSON.stringify({
+      token: "test_token_123",
+      action: "subscribe",
+      channel: "updates",
+    })
+  );
+};
+
+ws.onmessage = (message) => {
+  console.log("受信:", message.data);
+};
+```
+
+3. サーバーからメッセージを送信：
+
+```php
+$wsServer->sendToAll(json_encode([
+  'event' => 'update',
+  'data' => $payload
+]));
+```
+
+4. クライアントメッセージを処理：
+
+```php
+$wsServer->on('message', function($frame) {
+  // 受信メッセージを処理
+  $data = json_decode($frame->data, true);
+
+  // 異なるアクションを処理
+  switch ($data['action']) {
+    case 'subscribe':
+      // クライアントをチャネルに追加
+      break;
+    case 'unsubscribe':
+      // クライアントをチャネルから削除
+      break;
+    case 'message':
+      // チャネルにメッセージをブロードキャスト
+      break;
+  }
+});
+```
+
+### WebSocketテスト
+
+提供されているテストファイルを使用してWebSocket機能をテストできます：
+
+```bash
+php tests/WebSocket/WebSocketTest.php
+```
+
+または、.httpテストファイルを使用：
+
+```http
+### WebSocketテスト
+WEBSOCKET ws://127.0.0.1:9502/ws
+Content-Type: application/json
+
+{
+  "token": "test_token_123",
+  "action": "subscribe",
+  "channel": "updates"
+}
+```
+
 ## 言語選択
 
 本プロジェクトは以下の言語バージョンを提供しています：

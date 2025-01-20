@@ -15,6 +15,111 @@
 
 RTP is a high-performance real-time transport protocol bridge backend built on PHP and Swoole, designed to provide stable and efficient real-time data transmission services.
 
+## WebSocket Integration
+
+The project now includes WebSocket server implementation with the following features:
+
+- **Real-time bidirectional communication**: Enables real-time data exchange between server and clients
+- **High performance**: Built on Swoole's event-driven architecture
+- **Scalable**: Supports up to 1000 concurrent connections
+- **Secure**: Token-based authentication for WebSocket connections
+- **Integrated with API server**: Runs in parallel with HTTP API server
+
+### WebSocket Configuration
+
+WebSocket server can be configured through .env file:
+
+```env
+# WebSocket configuration
+WS_PORT=9502
+WS_HOST=127.0.0.1
+WS_PATH=/ws
+WS_MAX_CONNECTIONS=1000
+WS_TOKEN=test_token_123
+```
+
+### WebSocket Usage
+
+1. Start WebSocket server:
+
+```bash
+php src/index.php
+```
+
+2. Connect to WebSocket server:
+
+```javascript
+const ws = new WebSocket("ws://127.0.0.1:9502/ws");
+
+ws.onopen = () => {
+  console.log("Connected to WebSocket server");
+  ws.send(
+    JSON.stringify({
+      token: "test_token_123",
+      action: "subscribe",
+      channel: "updates",
+    })
+  );
+};
+
+ws.onmessage = (message) => {
+  console.log("Received:", message.data);
+};
+```
+
+3. Send messages from server:
+
+```php
+$wsServer->sendToAll(json_encode([
+  'event' => 'update',
+  'data' => $payload
+]));
+```
+
+4. Handle client messages:
+
+```php
+$wsServer->on('message', function($frame) {
+  // Process incoming message
+  $data = json_decode($frame->data, true);
+
+  // Handle different actions
+  switch ($data['action']) {
+    case 'subscribe':
+      // Add client to channel
+      break;
+    case 'unsubscribe':
+      // Remove client from channel
+      break;
+    case 'message':
+      // Broadcast message to channel
+      break;
+  }
+});
+```
+
+### Testing WebSocket
+
+WebSocket functionality can be tested using the provided test files:
+
+```bash
+php tests/WebSocket/WebSocketTest.php
+```
+
+Or using the .http test files:
+
+```http
+### WebSocket test
+WEBSOCKET ws://127.0.0.1:9502/ws
+Content-Type: application/json
+
+{
+  "token": "test_token_123",
+  "action": "subscribe",
+  "channel": "updates"
+}
+```
+
 ## Language Selection
 
 This project is available in the following languages:
