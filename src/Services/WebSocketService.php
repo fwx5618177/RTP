@@ -5,11 +5,14 @@ namespace App\Services;
 use App\Config\Config;
 use App\Exceptions\ValidationException;
 use App\Logs\Logger;
+use App\Routes\WebSocketRouter;
+use Swoole\WebSocket\Server;
 
 class WebSocketService
 {
     private Config $config;
     private Logger $logger;
+    private array $connections = [];
 
     public function __construct()
     {
@@ -22,13 +25,13 @@ class WebSocketService
         return uniqid('ws_', true);
     }
 
-    public function generateHandshake(string $connectionId, string $token): array
+    public function generateHandshake(string $client_id, string $token): array
     {
         return [
-            'connection_id' => $connectionId,
+            'client_id' => $client_id,
             'timestamp' => time(),
             'token' => $token,
-            'signature' => hash('sha256', $connectionId . $token . time()),
+            'signature' => hash('sha256', $client_id . $token . time()),
         ];
     }
 
@@ -134,5 +137,235 @@ class WebSocketService
         $path = trim($wsPath, '/');
 
         return "ws://{$wsHost}:{$wsPort}/{$path}/{$connectionId}";
+    }
+
+    /**
+     * 处理普通消息
+     */
+    public function processMessage(array $message): array
+    {
+        try {
+            // 验证消息格式
+            if (!isset($message['content'])) {
+                throw new ValidationException('Message content is required');
+            }
+
+            // 处理消息
+            return [
+                'type' => 'message',
+                'status' => 'success',
+                'content' => $message['content'],
+                'timestamp' => time()
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Error processing message', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return [
+                'type' => 'message',
+                'status' => 'error',
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * 广播消息给所有连接的客户端
+     */
+    public function broadcast(Server $server, int $fromFd, array $message): void
+    {
+        try {
+            if (!isset($message['message'])) {
+                throw new ValidationException('Broadcast message is required');
+            }
+
+            $broadcastData = json_encode([
+                'type' => 'broadcast',
+                'from' => $fromFd,
+                'message' => $message['message'],
+                'timestamp' => time()
+            ]);
+
+            // 获取所有连接的客户端
+            foreach ($server->connections as $fd) {
+                // 不给发送者广播
+                if ($fd !== $fromFd) {
+                    $server->push($fd, $broadcastData);
+                }
+            }
+
+            // 给发送者返回确认
+            $server->push($fromFd, json_encode([
+                'type' => 'broadcast',
+                'status' => 'success',
+                'message' => 'Broadcast sent successfully'
+            ]));
+        } catch (\Exception $e) {
+            $this->logger->error('Error broadcasting message', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'from_fd' => $fromFd
+            ]);
+
+            $server->push($fromFd, json_encode([
+                'type' => 'broadcast',
+                'status' => 'error',
+                'error' => $e->getMessage()
+            ]));
+        }
+    }
+
+    /**
+     * 发送私聊消息
+     */
+    public function sendPrivateMessage(Server $server, int $fromFd, array $message): void
+    {
+        try {
+            // 验证消息格式
+            if (!isset($message['to']) || !isset($message['message'])) {
+                throw new ValidationException('Invalid private message format');
+            }
+
+            // 在实际应用中，这里需要维护用户ID和连接FD的映射关系
+            // 这里简化处理，假设 'to' 就是目标连接的 FD
+            $toFd = (int)$message['to'];
+
+            // 检查目标连接是否存在且有效
+            if (!$server->exist($toFd)) {
+                throw new ValidationException('Target user is not connected');
+            }
+
+            $privateData = json_encode([
+                'type' => 'private',
+                'from' => $fromFd,
+                'message' => $message['message'],
+                'timestamp' => time()
+            ]);
+
+            // 发送消息给目标用户
+            $server->push($toFd, $privateData);
+
+            // 给发送者返回确认
+            $server->push($fromFd, json_encode([
+                'type' => 'private',
+                'status' => 'success',
+                'to' => $toFd,
+                'message' => 'Private message sent successfully'
+            ]));
+        } catch (\Exception $e) {
+            $this->logger->error('Error sending private message', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'from_fd' => $fromFd,
+                'to' => $message['to'] ?? null
+            ]);
+
+            $server->push($fromFd, json_encode([
+                'type' => 'private',
+                'status' => 'error',
+                'error' => $e->getMessage()
+            ]));
+        }
+    }
+
+    /**
+     * 存储连接信息
+     */
+    public function storeConnection(int $fd, array $connectionInfo): void
+    {
+        $this->connections[$fd] = $connectionInfo;
+        $this->logger->info('Connection stored', [
+            'fd' => $fd,
+            'connection_id' => $connectionInfo['connection_id'] ?? null
+        ]);
+    }
+
+    /**
+     * 移除连接信息
+     */
+    public function removeConnection(int $fd): void
+    {
+        if (isset($this->connections[$fd])) {
+            unset($this->connections[$fd]);
+            $this->logger->info('Connection removed', ['fd' => $fd]);
+        }
+    }
+
+    /**
+     * 获取连接信息
+     */
+    public function getConnection(int $fd): ?array
+    {
+        return $this->connections[$fd] ?? null;
+    }
+
+    /**
+     * 处理 WebSocket 握手
+     */
+    public function handleHandshake(Server $server, int $fd, array $handshakeData): bool
+    {
+        try {
+            if (!$this->validateHandshake($handshakeData)) {
+                throw new ValidationException('Invalid handshake');
+            }
+
+            if (!$this->validateToken($handshakeData['token'])) {
+                throw new ValidationException('Invalid token');
+            }
+
+            $this->storeConnection($fd, [
+                'connection_id' => $handshakeData['connection_id'],
+                'token' => $handshakeData['token'],
+                'timestamp' => time()
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            $this->logger->error('Handshake failed', [
+                'error' => $e->getMessage(),
+                'fd' => $fd
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * 处理 WebSocket 消息
+     */
+    public function handleMessage(Server $server, int $fd, string $data): void
+    {
+        try {
+            $message = json_decode($data, true);
+            if (!$message) {
+                throw new ValidationException('Invalid message format');
+            }
+
+            // 处理消息
+            $response = $this->processMessage($message);
+
+            // 发送响应
+            $server->push($fd, json_encode($response));
+        } catch (\Exception $e) {
+            $this->logger->error('Error handling message', [
+                'error' => $e->getMessage(),
+                'fd' => $fd
+            ]);
+
+            $server->push($fd, json_encode([
+                'status' => 'error',
+                'error' => $e->getMessage()
+            ]));
+        }
+    }
+
+    /**
+     * 处理连接关闭
+     */
+    public function handleClose(Server $server, int $fd): void
+    {
+        $this->removeConnection($fd);
+        $this->logger->info('Connection closed', ['fd' => $fd]);
     }
 }
