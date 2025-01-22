@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
-use App\Services\RoomService;
 use App\DTO\RoomDTO;
 use App\Exceptions\RoomException;
 use App\Http\Request;
 use App\Http\Response;
 use App\Logs\Logger;
+use App\Services\RoomService;
 use Psr\Container\ContainerInterface;
 
 class RoomController extends BaseController
@@ -32,6 +32,7 @@ class RoomController extends BaseController
         // 添加参数验证
         if (empty($data['userId'])) {
             $this->logger->warning('userId is required but was empty');
+
             return (new Response())
                 ->setStatusCode(400)
                 ->setBody(['error' => 'userId is required']);
@@ -39,6 +40,7 @@ class RoomController extends BaseController
 
         if (empty($data['roomName'])) {
             $this->logger->warning('roomName is required but was empty');
+
             return (new Response())
                 ->setStatusCode(400)
                 ->setBody(['error' => 'roomName is required']);
@@ -48,14 +50,14 @@ class RoomController extends BaseController
         $this->logger->debug('Created RoomDTO', ['dto' => [
             'userId' => $roomDTO->getUserId(),
             'roomName' => $roomDTO->getRoomName(),
-            'config' => $roomDTO->getConfig()
+            'config' => $roomDTO->getConfig(),
         ]]);
 
         try {
             $room = $this->roomService->createRoom($roomDTO);
             $this->logger->info('Room created successfully', [
                 'roomId' => $room->getRoomId(),
-                'createdAt' => $room->getCreatedAt()->format('c')
+                'createdAt' => $room->getCreatedAt()->format('c'),
             ]);
 
             return (new Response())
@@ -70,7 +72,7 @@ class RoomController extends BaseController
         } catch (\Exception $e) {
             $this->logger->error('Failed to create room', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return (new Response())
@@ -107,13 +109,14 @@ class RoomController extends BaseController
             }
 
             $result = $this->roomService->joinRoom($roomId, $userId);
+
             return (new Response())
                 ->setStatusCode(200)
                 ->setBody($result);
         } catch (\Exception $e) {
             $this->logger->error('Failed to join room', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             $statusCode = 500;
@@ -149,11 +152,12 @@ class RoomController extends BaseController
             $userId = $data['userId'];
 
             $this->roomService->leaveRoom($roomId, $userId);
+
             return (new Response())->setStatusCode(204);
         } catch (\Exception $e) {
             $this->logger->error('Failed to leave room', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             $statusCode = 500;
@@ -178,7 +182,7 @@ class RoomController extends BaseController
             ->setBody([
                 'message' => 'SIP call routed successfully',
                 'roomId' => $roomId,
-                'userId' => $userId
+                'userId' => $userId,
             ]);
     }
 }

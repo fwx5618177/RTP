@@ -24,12 +24,14 @@ class RedisService
         try {
             $this->redis->hmset($key, $data);
             $this->logger->info('Successfully set hash in Redis', ['key' => $key]);
+
             return true;
         } catch (\Exception $e) {
             $this->logger->error('Failed to set hash in Redis', [
                 'key' => $key,
                 'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -38,12 +40,14 @@ class RedisService
     {
         try {
             $data = $this->redis->hgetall($key);
+
             return $data ?: [];
         } catch (\Exception $e) {
             $this->logger->error('Failed to get hash from Redis', [
                 'key' => $key,
                 'error' => $e->getMessage(),
             ]);
+
             return [];
         }
     }
@@ -54,14 +58,16 @@ class RedisService
             $count = $this->redis->sadd($key, $members);
             $this->logger->info('Successfully added set members in Redis', [
                 'key' => $key,
-                'count' => $count
+                'count' => $count,
             ]);
+
             return $count;
         } catch (\Exception $e) {
             $this->logger->error('Failed to add set members in Redis', [
                 'key' => $key,
                 'error' => $e->getMessage(),
             ]);
+
             return 0;
         }
     }
@@ -72,29 +78,32 @@ class RedisService
             $count = $this->redis->srem($key, $member);
             $this->logger->info('Successfully removed set member in Redis', [
                 'key' => $key,
-                'member' => $member
+                'member' => $member,
             ]);
+
             return $count;
         } catch (\Exception $e) {
             $this->logger->error('Failed to remove set member in Redis', [
                 'key' => $key,
                 'error' => $e->getMessage(),
             ]);
+
             return 0;
         }
     }
-
 
     public function sMembers(string $key): array
     {
         try {
             $members = $this->redis->smembers($key);
+
             return $members ?: [];
         } catch (\Exception $e) {
             $this->logger->error('Failed to get set members from Redis', [
                 'key' => $key,
                 'error' => $e->getMessage(),
             ]);
+
             return [];
         }
     }
@@ -108,6 +117,7 @@ class RedisService
                 'key' => $key,
                 'error' => $e->getMessage(),
             ]);
+
             return 0;
         }
     }
@@ -118,14 +128,16 @@ class RedisService
             $count = $this->redis->del($keys);
             $this->logger->info('Successfully deleted keys from Redis', [
                 'keys' => $keys,
-                'count' => $count
+                'count' => $count,
             ]);
+
             return $count;
         } catch (\Exception $e) {
             $this->logger->error('Failed to delete keys from Redis', [
                 'keys' => $keys,
                 'error' => $e->getMessage(),
             ]);
+
             return 0;
         }
     }
@@ -139,6 +151,7 @@ class RedisService
                 'key' => $key,
                 'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -152,12 +165,14 @@ class RedisService
                 $this->redis->set($key, $this->serialize($value));
             }
             $this->logger->info('Successfully set key in Redis', ['key' => $key]);
+
             return true;
         } catch (\Exception $e) {
             $this->logger->error('Failed to set key in Redis', [
                 'key' => $key,
                 'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -166,12 +181,14 @@ class RedisService
     {
         try {
             $value = $this->redis->get($key);
+
             return $value === null ? null : $this->unserialize($value);
         } catch (\Exception $e) {
             $this->logger->error('Failed to get key from Redis', [
                 'key' => $key,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -181,12 +198,14 @@ class RedisService
         try {
             $result = $this->redis->del([$key]);
             $this->logger->info('Successfully deleted key from Redis', ['key' => $key]);
+
             return $result > 0;
         } catch (\Exception $e) {
             $this->logger->error('Failed to delete key from Redis', [
                 'key' => $key,
                 'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -202,6 +221,7 @@ class RedisService
     {
         try {
             $result = $this->redis->sismember($key, $member);
+
             return (bool) $result;
         } catch (\Exception $e) {
             $this->logger->error('Failed to check set member in Redis', [
@@ -209,6 +229,7 @@ class RedisService
                 'member' => $member,
                 'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }

@@ -8,7 +8,6 @@ use App\Repository\RoomRepository;
 use DateTime;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
-use Ramsey\Uuid\UuidInterface;
 
 #[ORM\Entity(repositoryClass: RoomRepository::class)]
 #[ORM\Table(name: 'rooms')]
@@ -92,6 +91,7 @@ class RoomEntity extends BaseEntity
     public function setId(int $id): self
     {
         $this->id = $id;
+
         return $this;
     }
 
@@ -108,6 +108,7 @@ class RoomEntity extends BaseEntity
     public function setRoomId(string $roomId): self
     {
         $this->roomId = $roomId;
+
         return $this;
     }
 
@@ -119,6 +120,7 @@ class RoomEntity extends BaseEntity
     public function setRoomName(string $roomName): self
     {
         $this->roomName = $roomName;
+
         return $this;
     }
 
@@ -130,6 +132,7 @@ class RoomEntity extends BaseEntity
     public function setConfig(array $config): self
     {
         $this->config = $config;
+
         return $this;
     }
 
@@ -151,6 +154,7 @@ class RoomEntity extends BaseEntity
     public function delete(): self
     {
         $this->handlePreDelete();
+
         return $this;
     }
 
@@ -158,6 +162,7 @@ class RoomEntity extends BaseEntity
     {
         $this->deletedAt = null;
         $this->logOperation('restored');
+
         return $this;
     }
 

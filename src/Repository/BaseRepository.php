@@ -2,10 +2,10 @@
 
 namespace App\Repository;
 
-use App\Utils\DBConnectionPool;
-use Doctrine\ORM\EntityRepository;
 use App\Exceptions\DatabaseException;
+use App\Utils\DBConnectionPool;
 use Doctrine\DBAL\Exception as DBALException;
+use Doctrine\ORM\EntityRepository;
 
 abstract class BaseRepository extends EntityRepository
 {
@@ -25,10 +25,11 @@ abstract class BaseRepository extends EntityRepository
 
         while ($attempts < $this->maxRetries) {
             $connection = null;
+
             try {
                 $connection = $this->connectionPool->getConnection();
 
-                if (!$connection->isTransactionActive()) {
+                if (! $connection->isTransactionActive()) {
                     $connection->beginTransaction();
                 }
 

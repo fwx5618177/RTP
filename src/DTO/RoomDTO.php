@@ -38,6 +38,7 @@ class RoomDTO
     public function setRoomName(string $roomName): self
     {
         $this->roomName = $roomName;
+
         return $this;
     }
 
@@ -49,6 +50,7 @@ class RoomDTO
     public function setConfig(array $config): self
     {
         $this->config = $config;
+
         return $this;
     }
 }

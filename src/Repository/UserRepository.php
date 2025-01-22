@@ -3,12 +3,12 @@
 namespace App\Repository;
 
 use App\Entity\UserEntity;
+use App\Exceptions\DatabaseException;
+use App\Utils\DBConnectionPool;
+use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\QueryBuilder;
-use App\Utils\DBConnectionPool;
-use App\Exceptions\DatabaseException;
-use Doctrine\DBAL\Exception as DBALException;
 
 class UserRepository extends EntityRepository
 {
@@ -207,6 +207,7 @@ class UserRepository extends EntityRepository
     protected function executeInTransaction(callable $callback)
     {
         $connection = null;
+
         try {
             $connection = DBConnectionPool::getInstance()->getConnection();
             $connection->beginTransaction();
@@ -214,11 +215,13 @@ class UserRepository extends EntityRepository
             $result = $callback($this->getEntityManager());
 
             $connection->commit();
+
             return $result;
         } catch (DBALException $e) {
             if ($connection && $connection->isTransactionActive()) {
                 $connection->rollBack();
             }
+
             throw new DatabaseException($e->getMessage(), $e->getCode(), $e);
         } finally {
             if ($connection) {

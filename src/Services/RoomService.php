@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Repository\RoomRepository;
-use App\Entity\RoomEntity;
 use App\DTO\RoomDTO;
-use App\Validator\Validator;
-use App\Services\RedisService;
+use App\Entity\RoomEntity;
 use App\Exceptions\RoomException;
 use App\Logs\Logger;
+use App\Repository\RoomRepository;
 use App\Utils\Container;
+use App\Validator\Validator;
 use Ramsey\Uuid\Uuid;
 
 class RoomService extends BaseService
@@ -38,12 +37,12 @@ class RoomService extends BaseService
         // Validate DTO
         $data = [
             'roomName' => $roomDTO->getRoomName(),
-            'config' => $roomDTO->getConfig()
+            'config' => $roomDTO->getConfig(),
         ];
 
         $rules = [
             'roomName' => 'required|string|min:3|max:50',
-            'config' => 'required|array'
+            'config' => 'required|array',
         ];
 
         $this->validator->validate($data, $rules);
@@ -80,7 +79,7 @@ class RoomService extends BaseService
             [
                 'created_at' => $room->getCreatedAt()->format('Y-m-d H:i:s'),
                 'config' => json_encode($room->getConfig()),
-                'status' => 'active'
+                'status' => 'active',
             ]
         );
 
@@ -113,7 +112,7 @@ class RoomService extends BaseService
             }
 
             // Check if room exists in Redis
-            if (!$this->redisService->exists("room:$roomId:metadata")) {
+            if (! $this->redisService->exists("room:$roomId:metadata")) {
                 throw new RoomException('Room not found');
             }
 
@@ -121,14 +120,14 @@ class RoomService extends BaseService
             if ($this->redisService->sIsMember("room:$roomId:participants", $userId)) {
                 $this->logger->info('User already in room', [
                     'roomId' => $roomId,
-                    'userId' => $userId
+                    'userId' => $userId,
                 ]);
 
                 // Return current room state
                 return [
                     'roomId' => $roomId,
                     'metadata' => $this->redisService->hGetAll("room:$roomId:metadata"),
-                    'participants' => $this->redisService->sMembers("room:$roomId:participants")
+                    'participants' => $this->redisService->sMembers("room:$roomId:participants"),
                 ];
             }
 
@@ -140,20 +139,21 @@ class RoomService extends BaseService
 
             $this->logger->info('User joined room', [
                 'roomId' => $roomId,
-                'userId' => $userId
+                'userId' => $userId,
             ]);
 
             return [
                 'roomId' => $roomId,
                 'metadata' => $metadata,
-                'participants' => $this->redisService->sMembers("room:$roomId:participants")
+                'participants' => $this->redisService->sMembers("room:$roomId:participants"),
             ];
         } catch (\Exception $e) {
             $this->logger->error('Error in joinRoom', [
                 'roomId' => $roomId,
                 'userId' => $userId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             throw $e;
         }
     }
@@ -171,7 +171,7 @@ class RoomService extends BaseService
             }
 
             // Check if room exists in Redis
-            if (!$this->redisService->exists("room:$roomId:metadata")) {
+            if (! $this->redisService->exists("room:$roomId:metadata")) {
                 throw new RoomException('Room not found');
             }
 
@@ -180,7 +180,7 @@ class RoomService extends BaseService
 
             $this->logger->info('User left room', [
                 'roomId' => $roomId,
-                'userId' => $userId
+                'userId' => $userId,
             ]);
 
             // Check if room is empty
@@ -192,8 +192,9 @@ class RoomService extends BaseService
             $this->logger->error('Error in leaveRoom', [
                 'roomId' => $roomId,
                 'userId' => $userId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             throw $e;
         }
     }
@@ -203,7 +204,7 @@ class RoomService extends BaseService
         // Delete Redis keys
         $this->redisService->del([
             "room:$roomId:metadata",
-            "room:$roomId:participants"
+            "room:$roomId:participants",
         ]);
 
         // Delete from MySQL
@@ -218,7 +219,7 @@ class RoomService extends BaseService
     public function handleSipCall(array $sipHeaders, string $roomId): void
     {
         // Check if room exists
-        if (!$this->redisService->exists("room:$roomId:metadata")) {
+        if (! $this->redisService->exists("room:$roomId:metadata")) {
             throw new RoomException('Room not found');
         }
 

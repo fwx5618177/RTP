@@ -48,7 +48,7 @@ class DBConnectionPool
                 \PDO::ATTR_AUTOCOMMIT => true,
                 \PDO::MYSQL_ATTR_FOUND_ROWS => true,
                 \PDO::MYSQL_ATTR_LOCAL_INFILE => false,
-            ]
+            ],
         ];
 
         $this->initializePool();
@@ -59,6 +59,7 @@ class DBConnectionPool
         if (self::$instance === null) {
             self::$instance = new self();
         }
+
         return self::$instance;
     }
 
@@ -77,6 +78,7 @@ class DBConnectionPool
             $this->connections[$id] = $connection;
             $this->inUse[$id] = false;
             $this->lastUsedTime[$id] = time();
+
             return $id;
         } catch (\Exception $e) {
             throw new DatabaseException("Failed to create database connection: " . $e->getMessage());
@@ -112,7 +114,7 @@ class DBConnectionPool
     private function ensureConnectionActive(Connection $connection): bool
     {
         try {
-            if (!$this->isConnectionValid($connection)) {
+            if (! $this->isConnectionValid($connection)) {
                 $params = $connection->getParams();
                 $driverOptions = $params['driverOptions'] ?? [];
                 $newPdo = new \PDO(
@@ -134,6 +136,7 @@ class DBConnectionPool
 
                 return true;
             }
+
             return true;
         } catch (\Exception $e) {
             return false;
@@ -145,9 +148,10 @@ class DBConnectionPool
         $this->removeInactiveConnections();
 
         foreach ($this->inUse as $id => $used) {
-            if (!$used) {
+            if (! $used) {
                 $this->inUse[$id] = true;
                 $this->lastUsedTime[$id] = time();
+
                 return $this->connections[$id];
             }
         }
@@ -155,6 +159,7 @@ class DBConnectionPool
         if (count($this->connections) < $this->maxConnections) {
             $id = $this->addConnection();
             $this->inUse[$id] = true;
+
             return $this->connections[$id];
         }
 
@@ -165,6 +170,7 @@ class DBConnectionPool
     {
         try {
             $connection->executeQuery('SELECT 1');
+
             return true;
         } catch (\Exception $e) {
             return false;
@@ -177,6 +183,7 @@ class DBConnectionPool
             if ($conn === $connection) {
                 $this->inUse[$id] = false;
                 $this->lastUsedTime[$id] = time();
+
                 break;
             }
         }
@@ -187,11 +194,10 @@ class DBConnectionPool
         $now = time();
         foreach ($this->lastUsedTime as $id => $time) {
             if (
-                !$this->inUse[$id] &&
+                ! $this->inUse[$id] &&
                 ($now - $time > $this->connectionTimeout) &&
                 count($this->connections) > $this->minConnections
             ) {
-
                 if (isset($this->connections[$id])) {
                     try {
                         $this->connections[$id]->close();

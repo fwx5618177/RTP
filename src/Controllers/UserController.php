@@ -32,7 +32,7 @@ class UserController extends BaseController
             $total = $this->userService->countUsers();
 
             $userDTOs = array_map(
-                fn($user) => UserDTO::fromEntity($user)->toArray(),
+                fn ($user) => UserDTO::fromEntity($user)->toArray(),
                 $users
             );
 

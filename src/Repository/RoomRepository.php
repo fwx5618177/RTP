@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\RoomEntity;
-use Doctrine\ORM\EntityManager;
+use App\Exceptions\RoomException;
 use App\Services\RedisService;
 use App\Utils\Container;
-use App\Exceptions\RoomException;
 use Doctrine\DBAL\Exception as DBALException;
-use App\Utils\DBConnectionPool;
-use App\Repository\BaseRepository;
+use Doctrine\ORM\EntityManager;
 
 class RoomRepository extends BaseRepository
 {
@@ -27,6 +25,7 @@ class RoomRepository extends BaseRepository
     public function createRoom(RoomEntity $room): RoomEntity
     {
         $connection = null;
+
         try {
             // 从连接池获取连接
             $connection = $this->connectionPool->getConnection();
@@ -47,7 +46,7 @@ class RoomRepository extends BaseRepository
                     'roomName' => $room->getRoomName(),
                     'config' => $room->getConfig(),
                     'participants' => [],
-                    'createdAt' => $room->getCreatedAt()->format('Y-m-d H:i:s')
+                    'createdAt' => $room->getCreatedAt()->format('Y-m-d H:i:s'),
                 ])
             );
 
@@ -60,6 +59,7 @@ class RoomRepository extends BaseRepository
             if ($connection && $connection->isTransactionActive()) {
                 $connection->rollBack();
             }
+
             throw new RoomException('Failed to create room: ' . $e->getMessage(), 0, $e);
         } finally {
             // 归还连接到连接池
@@ -104,7 +104,7 @@ class RoomRepository extends BaseRepository
             $roomData = json_decode($roomData, true);
             $roomData['participants'] = array_filter(
                 $roomData['participants'],
-                fn($participant) => $participant !== $userId
+                fn ($participant) => $participant !== $userId
             );
             $this->redisService->set("room:{$roomId}", json_encode($roomData));
         }
@@ -136,6 +136,7 @@ class RoomRepository extends BaseRepository
         return $this->executeInTransaction(function ($em) use ($room) {
             $em->persist($room);
             $em->flush();
+
             return $room;
         });
     }

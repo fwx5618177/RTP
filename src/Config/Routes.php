@@ -6,9 +6,9 @@ namespace App\Config;
 
 use App\Controllers\HomeController;
 use App\Controllers\RedisController;
+use App\Controllers\RoomController;
 use App\Controllers\UserController;
 use App\Controllers\WebSocketController;
-use App\Controllers\RoomController;
 use App\Middlewares\TestConditionMiddleware;
 use App\Middlewares\TestFlowMiddleware;
 use App\Routes\Router;
