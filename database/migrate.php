@@ -18,10 +18,19 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // 读取并执行 SQL 文件
-    $sql = file_get_contents(__DIR__ . '/migrations/create_users_table.sql');
-    $pdo->exec($sql);
+    $migrations = [
+        'create_users_table.sql',
+        'create_rooms_table.sql'  // 添加 rooms 表迁移
+    ];
 
-    $logger->info('Migration completed successfully');
+    foreach ($migrations as $migration) {
+        $logger->info("Executing migration: {$migration}");
+        $sql = file_get_contents(__DIR__ . '/migrations/' . $migration);
+        $pdo->exec($sql);
+        $logger->info("Successfully executed: {$migration}");
+    }
+
+    $logger->info('All migrations completed successfully');
     echo "Migration completed successfully\n";
 } catch (PDOException $e) {
     $logger->error('Migration failed: ' . $e->getMessage());

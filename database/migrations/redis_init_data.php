@@ -58,5 +58,36 @@ return [
             '192.168.1.1',
             '10.0.0.1'
         ]
+    ],
+
+    // 房间信息缓存模板
+    'cache:room:template' => [
+        'value' => [
+            'id' => null,
+            'room_id' => null,
+            'room_name' => null,
+            'config' => null,
+            'is_active' => true
+        ],
+        'ttl' => 3600 // 1小时
+    ],
+
+    // 活跃房间集合
+    'set:active_rooms' => [
+        'type' => 'set',
+        'value' => []
+    ],
+
+    // 房间在线用户计数
+    'counter:room:users:template' => [
+        'value' => 0,
+        'ttl' => 86400 // 24小时
+    ],
+
+    // 房间消息队列模板
+    'queue:room:messages:template' => [
+        'type' => 'list',
+        'value' => [],
+        'ttl' => 86400 // 24小时
     ]
 ];

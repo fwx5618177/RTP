@@ -6,6 +6,9 @@ use App\Entity\UserEntity;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\QueryBuilder;
+use App\Utils\DBConnectionPool;
+use App\Exceptions\DatabaseException;
+use Doctrine\DBAL\Exception as DBALException;
 
 class UserRepository extends EntityRepository
 {
@@ -16,19 +19,25 @@ class UserRepository extends EntityRepository
 
     public function save(UserEntity $user): void
     {
-        $this->getEntityManager()->persist($user);
-        $this->getEntityManager()->flush();
+        $this->executeInTransaction(function ($em) use ($user) {
+            $em->persist($user);
+            $em->flush();
+        });
     }
 
     public function delete(UserEntity $user): void
     {
-        $this->getEntityManager()->remove($user);
-        $this->getEntityManager()->flush();
+        $this->executeInTransaction(function ($em) use ($user) {
+            $em->remove($user);
+            $em->flush();
+        });
     }
 
     public function findByUuid(string $uuid): ?UserEntity
     {
-        return $this->findOneBy(['uuid' => $uuid]);
+        return $this->executeSafely(function ($em) use ($uuid) {
+            return $this->findOneBy(['uuid' => $uuid]);
+        });
     }
 
     public function findByEmail(string $email): ?UserEntity
@@ -193,5 +202,37 @@ class UserRepository extends EntityRepository
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
+    }
+
+    protected function executeInTransaction(callable $callback)
+    {
+        $connection = null;
+        try {
+            $connection = DBConnectionPool::getInstance()->getConnection();
+            $connection->beginTransaction();
+
+            $result = $callback($this->getEntityManager());
+
+            $connection->commit();
+            return $result;
+        } catch (DBALException $e) {
+            if ($connection && $connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+            throw new DatabaseException($e->getMessage(), $e->getCode(), $e);
+        } finally {
+            if ($connection) {
+                DBConnectionPool::getInstance()->releaseConnection($connection);
+            }
+        }
+    }
+
+    protected function executeSafely(callable $callback)
+    {
+        try {
+            return $callback($this->getEntityManager());
+        } catch (DBALException $e) {
+            throw new DatabaseException($e->getMessage(), $e->getCode(), $e);
+        }
     }
 }

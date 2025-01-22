@@ -1,0 +1,41 @@
+### 1. Create Room
+POST http://localhost:9501/api/rooms
+Content-Type: application/json
+
+{
+  "roomName": "Test Room",
+  "userName": "user123",
+  "config": {
+    "maxParticipants": 10,
+    "recordingEnabled": false
+  }
+}
+
+
+### 2. Join Room
+POST http://localhost:9501/api/rooms/join
+Content-Type: application/json
+
+{
+  "roomId": "c1bc6ad4-ad88-4467-a66b-1a5f52c3a67f",
+  "userId": "user123"
+}
+
+### 3. Leave Room
+POST http://localhost:9501/api/rooms/leave
+Content-Type: application/json
+
+{
+  "roomId": "c1bc6ad4-ad88-4467-a66b-1a5f52c3a67f",
+  "userId": "user123"
+}
+
+### 4. SIP Call
+POST http://localhost:9501/api/rooms/sip
+Content-Type: application/json
+X-Conference-Room: 1234
+X-Conference-Server: janus.example.com
+
+{
+  "roomId": "c1bc6ad4-ad88-4467-a66b-1a5f52c3a67f"
+}

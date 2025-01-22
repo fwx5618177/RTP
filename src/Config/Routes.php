@@ -8,6 +8,7 @@ use App\Controllers\HomeController;
 use App\Controllers\RedisController;
 use App\Controllers\UserController;
 use App\Controllers\WebSocketController;
+use App\Controllers\RoomController;
 use App\Middlewares\TestConditionMiddleware;
 use App\Middlewares\TestFlowMiddleware;
 use App\Routes\Router;
@@ -54,5 +55,15 @@ return function (Router $router) {
         'middleware' => [new TestConditionMiddleware()],
     ], function ($route) {
         $route->add('GET', '/connect', [WebSocketController::class, 'connect']);
+    });
+
+    // 房间相关路由组
+    $router->group([
+        'prefix' => '/api/rooms',
+        'middleware' => [],
+    ], function ($route) {
+        $route->add('POST', '/', [RoomController::class, 'createRoom']);
+        $route->add('POST', '/join', [RoomController::class, 'joinRoom']);
+        $route->add('POST', '/leave', [RoomController::class, 'leaveRoom']);
     });
 };

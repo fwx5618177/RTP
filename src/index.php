@@ -131,5 +131,14 @@ try {
         error_log('CRITICAL: ' . $e->getMessage());
     }
 
+    // 如果 WebSocket 服务器进程已启动，确保将其关闭
+    if (isset($pid) && $pid > 0) {
+        posix_kill($pid, SIGTERM);
+        pcntl_waitpid($pid, $status);
+        if (isset($logger)) {
+            $logger->info('WebSocket server process terminated');
+        }
+    }
+
     exit(1);
 }
