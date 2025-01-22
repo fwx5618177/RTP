@@ -1,0 +1,38 @@
+@host = localhost:9501
+
+### Create room
+# @name createRoom
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+  "userId": "user1",
+  "roomName": "Test Room",
+  "config": {
+    "maxParticipants": 10
+  }
+}
+
+### Join room with SIP headers
+@roomId = {{createRoom.response.body.roomId}}
+POST http://{{host}}/api/rooms/sip
+Content-Type: application/json
+X-Conference-Room: 12345
+X-Conference-Server: sip.example.com
+
+{
+  "roomId": "{{roomId}}",
+  "userId": "sip:user2@sip.example.com"
+}
+
+### Get room participants
+GET http://{{host}}/api/rooms/{{roomId}}/participants
+
+### Leave room
+POST http://{{host}}/api/rooms/leave
+Content-Type: application/json
+
+{
+  "roomId": "{{roomId}}",
+  "userId": "sip:user2@sip.example.com"
+}

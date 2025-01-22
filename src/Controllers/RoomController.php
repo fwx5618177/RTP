@@ -173,16 +173,32 @@ class RoomController extends BaseController
 
     private function handleSipCall(Request $request, string $roomId, string $userId): Response
     {
-        // TODO: Implement SIP call routing logic
-        // This would involve calling the internal API to bridge the call to Janus server
-        // and updating Redis with the participant information
+        try {
+            $sipHeaders = [
+                'X-Conference-Room' => $request->getHeader('X-Conference-Room'),
+                'X-Conference-Server' => $request->getHeader('X-Conference-Server')
+            ];
 
-        return (new Response())
-            ->setStatusCode(200)
-            ->setBody([
-                'message' => 'SIP call routed successfully',
-                'roomId' => $roomId,
-                'userId' => $userId,
+            // Call RoomService to handle SIP call
+            $this->roomService->handleSipCall($sipHeaders, $roomId);
+
+            return (new Response())
+                ->setStatusCode(200)
+                ->setBody([
+                    'message' => 'SIP call routed successfully',
+                    'roomId' => $roomId,
+                    'userId' => $userId,
+                    'sipHeaders' => $sipHeaders
+                ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to handle SIP call', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
+
+            return (new Response())
+                ->setStatusCode(500)
+                ->setBody(['error' => $e->getMessage()]);
+        }
     }
 }

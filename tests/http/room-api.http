@@ -1,5 +1,8 @@
+@host = localhost:9501
+
 ### 1. Create Room
-POST http://localhost:9501/api/rooms
+# @name createRoom
+POST http://{{host}}/api/rooms
 Content-Type: application/json
 
 {
@@ -11,31 +14,31 @@ Content-Type: application/json
   }
 }
 
-
 ### 2. Join Room
-POST http://localhost:9501/api/rooms/join
+@roomId = {{createRoom.response.body.roomId}}
+POST http://{{host}}/api/rooms/join
 Content-Type: application/json
 
 {
-  "roomId": "12168050-67e6-45f8-9dac-de8fda8b2c21",
+  "roomId": "{{roomId}}",
   "userId": "user123"
 }
 
 ### 3. Leave Room
-POST http://localhost:9501/api/rooms/leave
+POST http://{{host}}/api/rooms/leave
 Content-Type: application/json
 
 {
-  "roomId": "c1bc6ad4-ad88-4467-a66b-1a5f52c3a67f",
+  "roomId": "{{roomId}}",
   "userId": "user123"
 }
 
 ### 4. SIP Call
-POST http://localhost:9501/api/rooms/sip
+POST http://{{host}}/api/rooms/sip
 Content-Type: application/json
 X-Conference-Room: 1234
 X-Conference-Server: janus.example.com
 
 {
-  "roomId": "c1bc6ad4-ad88-4467-a66b-1a5f52c3a67f"
+  "roomId": "{{roomId}}"
 }

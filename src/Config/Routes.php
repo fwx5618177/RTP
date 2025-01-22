@@ -65,5 +65,6 @@ return function (Router $router) {
         $route->add('POST', '/', [RoomController::class, 'createRoom']);
         $route->add('POST', '/join', [RoomController::class, 'joinRoom']);
         $route->add('POST', '/leave', [RoomController::class, 'leaveRoom']);
+        $route->add('POST', '/sip', [RoomController::class, 'joinRoom']);
     });
 };
