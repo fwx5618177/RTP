@@ -1,6 +1,25 @@
 version: '3.8'
 
 services:
+  # Janus WebRTC Gateway
+  janus-gateway:
+    container_name: rtp-bridge-janus
+    image: canyan/janus-gateway:latest
+    command: [ "/usr/local/bin/janus", "-F", "/usr/local/etc/janus" ]
+    ports:
+      - "8088:8088"
+      - "8089:8089"
+      - "8889:8889"
+      - "8000:8000"
+      - "7088:7088"
+      - "7089:7089"
+    volumes:
+      - ./dockers/config/janus.jcfg:/usr/local/etc/janus/janus.jcfg
+      - ./dockers/config/janus.eventhandler.sampleevh.jcfg:/usr/local/etc/janus/janus.eventhandler.sampleevh.jcfg
+    networks:
+      - rtp-bridge
+    restart: always
+
   # MySQL Database
   mysql:
     image: mysql:8.0
@@ -41,6 +60,7 @@ services:
 volumes:
   db_data:
   redis_data:
+
 
 networks:
   rtp-bridge:

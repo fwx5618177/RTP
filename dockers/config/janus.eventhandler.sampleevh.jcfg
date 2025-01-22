@@ -1,0 +1,31 @@
+general: {
+  enabled = true
+  events = "all"
+  json = "indented"
+  log_level = 4
+  log_timestamps = true
+  log_colors = true
+  log_prefix = "[janus-eventhandler]"
+  log_file = "/var/log/janus/janus-eventhandler.log"
+  log_max_size = "10M"
+  log_max_files = 5
+  log_rotate = true
+}
+
+sampleevh: {
+  enabled = true
+  path = "/usr/local/lib/janus/eventhandlers/libjanus_sampleevh.so"
+  config = {
+    enabled = true
+    events = "all"
+    json = "indented"
+    log_level = 4
+    log_timestamps = true
+    log_colors = true
+    log_prefix = "[janus-sampleevh]"
+    log_file = "/var/log/janus/janus-sampleevh.log"
+    log_max_size = "10M"
+    log_max_files = 5
+    log_rotate = true
+  }
+}

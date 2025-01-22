@@ -1,0 +1,25 @@
+general: {
+  enabled = true
+  json = "indented"
+  base_path = "/usr/local/etc/janus"
+  configs_path = "/usr/local/etc/janus"
+  plugins_path = "/usr/local/lib/janus/plugins"
+  transports_path = "/usr/local/lib/janus/transports"
+  log_to_stdout = true
+  log_level = 4
+  log_timestamps = true
+  log_colors = true
+  log_prefix = "[janus]"
+  log_file = "/var/log/janus/janus.log"
+  log_max_size = "10M"
+  log_max_files = 5
+  log_rotate = true
+}
+
+plugins: {
+  disable = "libjanus_voicemail.so,libjanus_recordplay.so"
+}
+
+transports: {
+  disable = "libjanus_websockets.so"
+}
