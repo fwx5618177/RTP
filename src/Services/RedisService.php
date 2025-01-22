@@ -84,6 +84,7 @@ class RedisService
         }
     }
 
+
     public function sMembers(string $key): array
     {
         try {
@@ -184,6 +185,28 @@ class RedisService
         } catch (\Exception $e) {
             $this->logger->error('Failed to delete key from Redis', [
                 'key' => $key,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Check if member exists in the set
+     *
+     * @param string $key The key of the set
+     * @param string $member The member to check
+     * @return bool Returns true if member exists in the set, false otherwise
+     */
+    public function sIsMember(string $key, string $member): bool
+    {
+        try {
+            $result = $this->redis->sismember($key, $member);
+            return (bool) $result;
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to check set member in Redis', [
+                'key' => $key,
+                'member' => $member,
                 'error' => $e->getMessage(),
             ]);
             return false;

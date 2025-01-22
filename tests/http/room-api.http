@@ -4,7 +4,7 @@ Content-Type: application/json
 
 {
   "roomName": "Test Room",
-  "userName": "user123",
+  "userId": "user123",
   "config": {
     "maxParticipants": 10,
     "recordingEnabled": false
@@ -17,7 +17,7 @@ POST http://localhost:9501/api/rooms/join
 Content-Type: application/json
 
 {
-  "roomId": "c1bc6ad4-ad88-4467-a66b-1a5f52c3a67f",
+  "roomId": "12168050-67e6-45f8-9dac-de8fda8b2c21",
   "userId": "user123"
 }
 

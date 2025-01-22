@@ -102,38 +102,99 @@ class RoomService extends BaseService
 
     public function joinRoom(string $roomId, string $userId): array
     {
-        // Check if room exists in Redis
-        if (!$this->redisService->exists("room:$roomId:metadata")) {
-            throw new RoomException('Room not found');
+        try {
+            // Validate parameters
+            if (empty($roomId)) {
+                throw new RoomException('Room ID cannot be empty');
+            }
+
+            if (empty($userId)) {
+                throw new RoomException('User ID cannot be empty');
+            }
+
+            // Check if room exists in Redis
+            if (!$this->redisService->exists("room:$roomId:metadata")) {
+                throw new RoomException('Room not found');
+            }
+
+            // Check if user is already in the room
+            if ($this->redisService->sIsMember("room:$roomId:participants", $userId)) {
+                $this->logger->info('User already in room', [
+                    'roomId' => $roomId,
+                    'userId' => $userId
+                ]);
+
+                // Return current room state
+                return [
+                    'roomId' => $roomId,
+                    'metadata' => $this->redisService->hGetAll("room:$roomId:metadata"),
+                    'participants' => $this->redisService->sMembers("room:$roomId:participants")
+                ];
+            }
+
+            // Add user to participants
+            $this->redisService->sAdd("room:$roomId:participants", [$userId]);
+
+            // Get room metadata
+            $metadata = $this->redisService->hGetAll("room:$roomId:metadata");
+
+            $this->logger->info('User joined room', [
+                'roomId' => $roomId,
+                'userId' => $userId
+            ]);
+
+            return [
+                'roomId' => $roomId,
+                'metadata' => $metadata,
+                'participants' => $this->redisService->sMembers("room:$roomId:participants")
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Error in joinRoom', [
+                'roomId' => $roomId,
+                'userId' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
-
-        // Add user to participants
-        $this->redisService->sAdd("room:$roomId:participants", [$userId]);
-
-        // Get room metadata
-        $metadata = $this->redisService->hGetAll("room:$roomId:metadata");
-
-        return [
-            'roomId' => $roomId,
-            'metadata' => $metadata,
-            'participants' => $this->redisService->sMembers("room:$roomId:participants")
-        ];
     }
 
     public function leaveRoom(string $roomId, string $userId): void
     {
-        // Check if room exists in Redis
-        if (!$this->redisService->exists("room:$roomId:metadata")) {
-            throw new RoomException('Room not found');
-        }
+        try {
+            // Validate parameters
+            if (empty($roomId)) {
+                throw new RoomException('Room ID cannot be empty');
+            }
 
-        // Remove user from participants
-        $this->redisService->sRem("room:$roomId:participants", $userId);
+            if (empty($userId)) {
+                throw new RoomException('User ID cannot be empty');
+            }
 
-        // Check if room is empty
-        $participantCount = $this->redisService->sCard("room:$roomId:participants");
-        if ($participantCount === 0) {
-            $this->cleanupRoom($roomId);
+            // Check if room exists in Redis
+            if (!$this->redisService->exists("room:$roomId:metadata")) {
+                throw new RoomException('Room not found');
+            }
+
+            // Remove user from participants
+            $this->redisService->sRem("room:$roomId:participants", $userId);
+
+            $this->logger->info('User left room', [
+                'roomId' => $roomId,
+                'userId' => $userId
+            ]);
+
+            // Check if room is empty
+            $participantCount = $this->redisService->sCard("room:$roomId:participants");
+            if ($participantCount === 0) {
+                $this->cleanupRoom($roomId);
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('Error in leaveRoom', [
+                'roomId' => $roomId,
+                'userId' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 

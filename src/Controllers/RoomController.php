@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Services\RoomService;
 use App\DTO\RoomDTO;
+use App\Exceptions\RoomException;
 use App\Http\Request;
 use App\Http\Response;
 use App\Logs\Logger;
@@ -29,16 +30,24 @@ class RoomController extends BaseController
         $this->logger->info('Creating room with data', ['data' => $data]);
 
         // 添加参数验证
-        if (empty($data['userName'])) {
-            $this->logger->warning('userName is required but was empty');
+        if (empty($data['userId'])) {
+            $this->logger->warning('userId is required but was empty');
             return (new Response())
                 ->setStatusCode(400)
-                ->setBody(['error' => 'userName is required']);
+                ->setBody(['error' => 'userId is required']);
         }
 
-        $roomDTO = new RoomDTO($data['userName'], $data['config'] ?? []);
+        if (empty($data['roomName'])) {
+            $this->logger->warning('roomName is required but was empty');
+            return (new Response())
+                ->setStatusCode(400)
+                ->setBody(['error' => 'roomName is required']);
+        }
+
+        $roomDTO = new RoomDTO($data['userId'], $data['roomName'], $data['config'] ?? []);
         $this->logger->debug('Created RoomDTO', ['dto' => [
-            'userName' => $roomDTO->getRoomName(),
+            'userId' => $roomDTO->getUserId(),
+            'roomName' => $roomDTO->getRoomName(),
             'config' => $roomDTO->getConfig()
         ]]);
 
@@ -54,7 +63,9 @@ class RoomController extends BaseController
                 ->setBody([
                     'roomId' => $room->getRoomId(),
                     'createdAt' => $room->getCreatedAt()->format('c'),
-                    'config' => $room->getConfig()
+                    'config' => $room->getConfig(),
+                    'userId' => $roomDTO->getUserId(),
+                    'roomName' => $roomDTO->getRoomName(),
                 ]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to create room', [
@@ -70,40 +81,88 @@ class RoomController extends BaseController
 
     public function joinRoom(Request $request): Response
     {
-        $data = $request->getBodyParams();
-        $roomId = $data['roomId'];
-        $userId = $data['userId'];
-
-        // Check for SIP headers
-        if ($request->getHeader('X-Conference-Room') && $request->getHeader('X-Conference-Server')) {
-            // Handle SIP call routing
-            return $this->handleSipCall($request, $roomId, $userId);
-        }
-
         try {
+            $data = $request->getBodyParams();
+
+            // Validate required parameters
+            if (empty($data['roomId'])) {
+                return (new Response())
+                    ->setStatusCode(400)
+                    ->setBody(['error' => 'roomId is required']);
+            }
+
+            if (empty($data['userId'])) {
+                return (new Response())
+                    ->setStatusCode(400)
+                    ->setBody(['error' => 'userId is required']);
+            }
+
+            $roomId = $data['roomId'];
+            $userId = $data['userId'];
+
+            // Check for SIP headers
+            if ($request->getHeader('X-Conference-Room') && $request->getHeader('X-Conference-Server')) {
+                // Handle SIP call routing
+                return $this->handleSipCall($request, $roomId, $userId);
+            }
+
             $result = $this->roomService->joinRoom($roomId, $userId);
             return (new Response())
                 ->setStatusCode(200)
                 ->setBody($result);
         } catch (\Exception $e) {
+            $this->logger->error('Failed to join room', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $statusCode = 500;
+            if ($e instanceof RoomException) {
+                $statusCode = 404;
+            }
+
             return (new Response())
-                ->setStatusCode(404)
+                ->setStatusCode($statusCode)
                 ->setBody(['error' => $e->getMessage()]);
         }
     }
 
     public function leaveRoom(Request $request): Response
     {
-        $data = $request->getBodyParams();
-        $roomId = $data['roomId'];
-        $userId = $data['userId'];
-
         try {
+            $data = $request->getBodyParams();
+
+            // Validate required parameters
+            if (empty($data['roomId'])) {
+                return (new Response())
+                    ->setStatusCode(400)
+                    ->setBody(['error' => 'roomId is required']);
+            }
+
+            if (empty($data['userId'])) {
+                return (new Response())
+                    ->setStatusCode(400)
+                    ->setBody(['error' => 'userId is required']);
+            }
+
+            $roomId = $data['roomId'];
+            $userId = $data['userId'];
+
             $this->roomService->leaveRoom($roomId, $userId);
             return (new Response())->setStatusCode(204);
         } catch (\Exception $e) {
+            $this->logger->error('Failed to leave room', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $statusCode = 500;
+            if ($e instanceof RoomException) {
+                $statusCode = 404;
+            }
+
             return (new Response())
-                ->setStatusCode(404)
+                ->setStatusCode($statusCode)
                 ->setBody(['error' => $e->getMessage()]);
         }
     }

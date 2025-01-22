@@ -6,27 +6,38 @@ namespace App\DTO;
 
 class RoomDTO
 {
-    private string $userName;
+    private string $userId;
+    private string $roomName;
     private array $config;
 
-    public function __construct(string $userName, array $config = [])
+    public function __construct(string $userId, string $roomName, array $config = [])
     {
-        if (empty(trim($userName))) {
-            throw new \InvalidArgumentException('userName cannot be empty');
+        if (empty(trim($userId))) {
+            throw new \InvalidArgumentException('userId cannot be empty');
         }
 
-        $this->userName = $userName;
+        if (empty(trim($roomName))) {
+            throw new \InvalidArgumentException('roomName cannot be empty');
+        }
+
+        $this->userId = $userId;
+        $this->roomName = $roomName;
         $this->config = $config;
     }
 
     public function getRoomName(): string
     {
-        return $this->userName;
+        return $this->roomName;
+    }
+
+    public function getUserId(): string
+    {
+        return $this->userId;
     }
 
     public function setRoomName(string $roomName): self
     {
-        $this->userName = $roomName;
+        $this->roomName = $roomName;
         return $this;
     }
 
