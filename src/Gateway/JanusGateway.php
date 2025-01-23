@@ -7,9 +7,17 @@ namespace App\Gateway;
 use App\Config\Config;
 use App\Exceptions\GatewayException;
 use App\Logs\Logger;
-use RTCKit\SIP\Message;
 use RTCKit\SIP\Request;
 use RTCKit\SIP\Response;
+use RTCKit\SIP\URI;
+use RTCKit\SIP\Header\{
+    ViaHeader,
+    FromHeader,
+    ScalarHeader,
+    CallIdHeader,
+    CSeqHeader,
+    SingleValueWithParamsHeader
+};
 
 class JanusGateway
 {
@@ -38,16 +46,52 @@ class JanusGateway
             // 1. 创建 SIP INVITE 请求
             $invite = new Request();
             $invite->method = 'INVITE';
-            $invite->uri = "sip:room_{$roomName}@{$this->config->get('JANUS_HOST')}";
-            $invite->extraHeaders = [
-                'Via' => ['SIP/2.0/UDP ' . $this->config->get('JANUS_HOST')],
-                'From' => ["<sip:{$userId}@{$this->config->get('JANUS_HOST')}>"],
-                'To' => ["<sip:room_{$roomName}@{$this->config->get('JANUS_HOST')}>"],
-                'Call-ID' => [uniqid()],
-                'CSeq' => ['1 INVITE'],
-                'Content-Type' => ['application/sdp'],
-                'Content-Length' => [strlen($sdpOffer)]
+
+            // 创建 URI 对象
+            $uri = new URI();
+            $uri->scheme = 'sip';
+            $uri->host = $this->config->get('JANUS_HOST');
+            $uri->user = "room_{$roomName}";
+            $invite->uri = $uri;
+
+            // 构建 From 和 To URI 字符串
+            $fromUriStr = sprintf('sip:%s@%s', $userId, $this->config->get('JANUS_HOST'));
+            $toUriStr = sprintf('sip:room_%s@%s', $roomName, $this->config->get('JANUS_HOST'));
+
+            // 创建并设置 SIP 消息头
+            $via = new ViaHeader();
+            $via->values = [
+                'SIP/2.0/UDP ' . $this->config->get('JANUS_HOST')
             ];
+            $invite->via = $via;
+
+            $from = new FromHeader();
+            $from->uri = new URI($fromUriStr);
+            $invite->from = $from;
+
+            $to = new FromHeader();
+            $to->uri = new URI($toUriStr);
+            $invite->to = $to;
+
+            $callId = new CallIdHeader();
+            $callId->value = uniqid();
+            $invite->callId = $callId;
+
+            $cSeq = new CSeqHeader();
+            $cSeq->sequence = 1;
+            $cSeq->method = 'INVITE';
+            $invite->cSeq = $cSeq;
+
+            // 设置 Content-Type header
+            $contentType = new SingleValueWithParamsHeader();
+            $contentType->value = 'application/sdp';
+            $invite->contentType = $contentType;
+
+            // 设置 Content-Length header
+            $contentLength = new ScalarHeader();
+            $contentLength->value = (int)strlen($sdpOffer);
+            $invite->contentLength = $contentLength;
+
             $invite->body = $sdpOffer;
 
             // 2. 发送 INVITE 请求
