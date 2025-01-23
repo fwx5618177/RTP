@@ -1,4 +1,4 @@
-@host = localhost:8080
+@host = localhost:9501
 
 ### Create room with audio only
 # @name createRoom
@@ -66,14 +66,41 @@ Content-Type: application/json
     "userId": "user789"
 }
 
-### Audio Stream Commands Reference
-# 1. Send G.711 u-law audio
-# ffmpeg -re -i test.wav -acodec pcm_mulaw -ar 8000 -ac 1 \
-#   -f rtp rtp://{{host}}:10000
+@host = localhost:9501
 
-# 2. Send G.711 a-law audio
-# ffmpeg -re -i test.wav -acodec pcm_alaw -ar 8000 -ac 1 \
-#   -f rtp rtp://{{host}}:10000
+### Create room
+# @name createRoom
+POST http://{{host}}/api/rooms
+Content-Type: application/json
 
-# 3. Record incoming RTP stream
-# ffmpeg -i rtp://0.0.0.0:10002 -acodec copy output.wav
+{
+  "userId": "user1",
+  "roomName": "Test Room",
+  "config": {
+    "maxParticipants": 10
+  }
+}
+
+### Join room with SIP headers
+@roomId = {{createRoom.response.body.roomId}}
+POST http://{{host}}/api/rooms/sip
+Content-Type: application/json
+X-Conference-Room: 12345
+X-Conference-Server: sip.example.com
+
+{
+  "roomId": "{{roomId}}",
+  "userId": "sip:user2@sip.example.com"
+}
+
+### Get room participants
+GET http://{{host}}/api/rooms/{{roomId}}/participants
+
+### Leave room
+POST http://{{host}}/api/rooms/leave
+Content-Type: application/json
+
+{
+  "roomId": "{{roomId}}",
+  "userId": "sip:user2@sip.example.com"
+}
