@@ -5,6 +5,7 @@ general: {
   configs_path = "/usr/local/etc/janus"
   plugins_path = "/usr/local/lib/janus/plugins"
   transports_path = "/usr/local/lib/janus/transports"
+  api_secret = "janusrocks"
   log_to_stdout = true
   log_level = 4
   log_timestamps = true
@@ -17,9 +18,14 @@ general: {
 }
 
 plugins: {
-  disable = "libjanus_voicemail.so,libjanus_recordplay.so"
+  disable = "libjanus_voicemail.so,libjanus_recordplay.so,libjanus_echotest.so"
 }
 
 transports: {
-  disable = "libjanus_websockets.so"
+  disable = ""
+}
+
+media: {
+  rtp_port_range = "10000-20000"
+  nat_1_1_mapping = "1.2.3.4"
 }

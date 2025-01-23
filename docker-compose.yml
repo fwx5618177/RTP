@@ -13,12 +13,17 @@ services:
       - "8000:8000"
       - "7088:7088"
       - "7089:7089"
+      - "10000-20000:10000-20000/udp"
     volumes:
       - ./dockers/config/janus.jcfg:/usr/local/etc/janus/janus.jcfg
       - ./dockers/config/janus.eventhandler.sampleevh.jcfg:/usr/local/etc/janus/janus.eventhandler.sampleevh.jcfg
+      - ./dockers/logs/janus:/var/log/janus
     networks:
       - rtp-bridge
     restart: always
+    environment:
+      - JANUS_API_SECRET=janusrocks
+      - JANUS_LOG_LEVEL=4
 
   # MySQL Database
   mysql:
