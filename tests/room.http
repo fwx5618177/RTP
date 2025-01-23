@@ -1,0 +1,40 @@
+### Create Room
+POST http://localhost:8080/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user123",
+    "roomName": "test_room",
+    "config": {
+        "maxParticipants": 10,
+        "videoEnabled": true,
+        "audioEnabled": true
+    }
+}
+
+### Expected Response:
+# HTTP/1.1 201 Created
+# {
+#     "roomId": "room_60f1e2b3c4d5e6f7",
+#     "createdAt": "2024-01-20T10:30:00+00:00",
+#     "config": {
+#         "maxParticipants": 10,
+#         "videoEnabled": true,
+#         "audioEnabled": true,
+#         "mediaInfo": {
+#             "audio": {
+#                 "port": 10000,
+#                 "protocol": "RTP/AVP",
+#                 "formats": [0, 8, 101]
+#             },
+#             "video": {
+#                 "port": 10002,
+#                 "protocol": "RTP/AVP",
+#                 "formats": [96, 97]
+#             }
+#         },
+#         "ip": "192.168.1.100"
+#     },
+#     "userId": "user123",
+#     "roomName": "test_room"
+# } 

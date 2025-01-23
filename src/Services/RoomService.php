@@ -7,6 +7,7 @@ namespace App\Services;
 use App\DTO\RoomDTO;
 use App\Entity\RoomEntity;
 use App\Exceptions\RoomException;
+use App\Gateway\JanusGateway;
 use App\Logs\Logger;
 use App\Repository\RoomRepository;
 use App\Utils\Container;
@@ -16,6 +17,7 @@ use Ramsey\Uuid\Uuid;
 class RoomService extends BaseService
 {
     private Logger $logger;
+    private JanusGateway $janusGateway;
 
     public function __construct(
         protected RoomRepository $roomRepository,
@@ -24,6 +26,7 @@ class RoomService extends BaseService
     ) {
         parent::__construct();
         $this->logger = Container::getInstance()->get(Logger::class);
+        $this->janusGateway = new JanusGateway();
 
         $this->roomRepository = $roomRepository;
         $this->validator = $validator;
@@ -32,41 +35,65 @@ class RoomService extends BaseService
 
     public function createRoom(RoomDTO $roomDTO): RoomEntity
     {
-        $this->logger->info('Starting room creation', ['roomName' => $roomDTO->getRoomName()]);
+        try {
+            $this->logger->info('Starting room creation', ['roomName' =>
+            $roomDTO->getRoomName()]);
+            // Validate DTO
+            $data = [
+                'roomName' => $roomDTO->getRoomName(),
+                'config' => $roomDTO->getConfig(),
+            ];
 
-        // Validate DTO
-        $data = [
-            'roomName' => $roomDTO->getRoomName(),
-            'config' => $roomDTO->getConfig(),
-        ];
+            $rules = [
+                'roomName' => 'required|string|min:3|max:50',
+                'config' => 'required|array',
+            ];
 
-        $rules = [
-            'roomName' => 'required|string|min:3|max:50',
-            'config' => 'required|array',
-        ];
+            $this->validator->validate($data, $rules);
 
-        $this->validator->validate($data, $rules);
+            // Generate room ID
+            $roomId = $this->generateRoomId();
 
-        // Generate room ID
-        $roomId = $this->generateRoomId();
+            // 1. 通过 Janus Gateway 创建房间会话
+            $sessionInfo = $this->janusGateway->createRoomSession(
+                $roomDTO->getRoomName(),
+                $roomDTO->getUserId()
+            );
 
-        // Create room entity
-        $room = new RoomEntity(
-            $roomId,
-            $roomDTO->getRoomName(),
-            $roomDTO->getConfig()
-        );
+            // 2. 创建房间实体
+            $room = new RoomEntity(
+                $sessionInfo['roomId'],
+                $roomDTO->getRoomName(),
+                array_merge($roomDTO->getConfig(), [
+                    'mediaInfo' => $sessionInfo['mediaInfo'],
+                    'ip' => $sessionInfo['ip'],
+                    'timestamp' => $sessionInfo['timestamp']
+                ])
+            );
 
-        // Save to MySQL
-        $room = $this->roomRepository->save($room);
+            // Save to MySQL
+            $room = $this->roomRepository->save($room);
 
-        // Initialize Redis data
-        $this->initializeRedisRoomData($room);
+            // Initialize Redis data
+            $this->initializeRedisRoomData($room);
 
-        // Cache the room
-        $this->cacheRoom($room);
+            // Cache the room
+            $this->cacheRoom($room);
 
-        return $room;
+            $this->logger->info('Room created successfully', [
+                'roomId' => $room->getRoomId(),
+                'roomName' => $room->getRoomName(),
+                'config' => $room->getConfig()
+            ]);
+
+            return $room;
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to create room', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new RoomException('Failed to create room: ' . $e->getMessage());
+        }
     }
 
     private function initializeRedisRoomData(RoomEntity $room): void
