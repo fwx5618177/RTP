@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Janus WebRTC Gateway
+  # Janus Gateway
   janus-gateway:
     container_name: rtp-bridge-janus
     image: canyan/janus-gateway:latest
@@ -13,7 +13,8 @@ services:
       - "8000:8000"
       - "7088:7088"
       - "7089:7089"
-      - "10000-20000:10000-20000/udp"
+      - "10000-20000:10000-20000/udp" # RTP/RTCP
+      - "5060:5060/udp"
     volumes:
       - ./dockers/config/janus.jcfg:/usr/local/etc/janus/janus.jcfg
       - ./dockers/config/janus.eventhandler.sampleevh.jcfg:/usr/local/etc/janus/janus.eventhandler.sampleevh.jcfg

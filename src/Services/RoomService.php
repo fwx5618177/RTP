@@ -7,17 +7,17 @@ namespace App\Services;
 use App\DTO\RoomDTO;
 use App\Entity\RoomEntity;
 use App\Exceptions\RoomException;
-use App\Gateway\JanusGateway;
 use App\Logs\Logger;
 use App\Repository\RoomRepository;
 use App\Utils\Container;
 use App\Validator\Validator;
 use Ramsey\Uuid\Uuid;
+use App\Media\MediaManager;
 
 class RoomService extends BaseService
 {
     private Logger $logger;
-    private JanusGateway $janusGateway;
+    private MediaManager $mediaManager;
 
     public function __construct(
         protected RoomRepository $roomRepository,
@@ -26,7 +26,7 @@ class RoomService extends BaseService
     ) {
         parent::__construct();
         $this->logger = Container::getInstance()->get(Logger::class);
-        $this->janusGateway = new JanusGateway();
+        $this->mediaManager = new MediaManager();
 
         $this->roomRepository = $roomRepository;
         $this->validator = $validator;
@@ -54,13 +54,13 @@ class RoomService extends BaseService
             // Generate room ID
             $roomId = $this->generateRoomId();
 
-            // 1. 通过 Janus Gateway 创建房间会话
-            $sessionInfo = $this->janusGateway->createRoomSession(
+            // 创建媒体会话
+            $sessionInfo = $this->mediaManager->createMediaSession(
                 $roomDTO->getRoomName(),
                 $roomDTO->getUserId()
             );
 
-            // 2. 创建房间实体
+            // 创建房间实体
             $room = new RoomEntity(
                 $sessionInfo['roomId'],
                 $roomDTO->getRoomName(),

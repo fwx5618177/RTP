@@ -1,0 +1,79 @@
+@host = localhost:8080
+
+### Create room with audio only
+# @name createRoom
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user123",
+    "roomName": "test_room",
+    "config": {
+        "maxParticipants": 10,
+        "audioEnabled": true,
+        "videoEnabled": false
+    }
+}
+
+### Create room with invalid configuration
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user123",
+    "roomName": "test_room",
+    "config": {
+        "maxParticipants": -1,
+        "audioEnabled": true
+    }
+}
+
+### Create room with duplicate name
+@roomId = {{createRoom.response.body.roomId}}
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user456",
+    "roomName": "test_room",
+    "config": {
+        "maxParticipants": 10,
+        "audioEnabled": true
+    }
+}
+
+### Get room details
+GET http://{{host}}/api/rooms/{{roomId}}
+
+### Get room participants
+GET http://{{host}}/api/rooms/{{roomId}}/participants
+
+### Join room
+POST http://{{host}}/api/rooms/join
+Content-Type: application/json
+
+{
+    "roomId": "{{roomId}}",
+    "userId": "user789"
+}
+
+### Leave room
+POST http://{{host}}/api/rooms/leave
+Content-Type: application/json
+
+{
+    "roomId": "{{roomId}}",
+    "userId": "user789"
+}
+
+### Audio Stream Commands Reference
+# 1. Send G.711 u-law audio
+# ffmpeg -re -i test.wav -acodec pcm_mulaw -ar 8000 -ac 1 \
+#   -f rtp rtp://{{host}}:10000
+
+# 2. Send G.711 a-law audio
+# ffmpeg -re -i test.wav -acodec pcm_alaw -ar 8000 -ac 1 \
+#   -f rtp rtp://{{host}}:10000
+
+# 3. Record incoming RTP stream
+# ffmpeg -i rtp://0.0.0.0:10002 -acodec copy output.wav
