@@ -61,7 +61,16 @@ class JanusGateway
             // 创建并设置 SIP 消息头
             $via = new ViaHeader();
             $via->values = [
-                'SIP/2.0/UDP ' . $this->config->get('JANUS_HOST')
+                'protocol' => 'SIP',
+                'version' => '2.0',
+                'transport' => 'UDP',
+                'host' => $this->config->get('JANUS_HOST'),
+                'branch' => 'z9hG4bK' . uniqid(),
+                'rport' => null,
+                'params' => [
+                    'branch' => 'z9hG4bK' . uniqid(),
+                    'rport' => null
+                ]
             ];
             $invite->via = $via;
 
