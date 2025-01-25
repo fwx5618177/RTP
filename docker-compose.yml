@@ -5,41 +5,18 @@ services:
   janus-gateway:
     container_name: rtp-bridge-janus
     image: canyan/janus-gateway:latest
-    command: >
-      sh -c "apt-get update && 
-             apt-get install -y procps && 
-             /usr/local/bin/janus -F /usr/local/etc/janus"
-    tty: true
-    stdin_open: true
+    command: [ "/usr/local/bin/janus", "-F", "/usr/local/etc/janus" ]
     ports:
-      - "8088:8088" # REST API
-      - "8089:8089" # HTTPS REST API
-      - "8889:8889" # WebSocket
-      - "8000:8000" # HTTPS WebSocket
-      - "7088:7088" # Admin API
-      - "7089:7089" # HTTPS Admin API
-      - "5060:5060/udp" # SIP UDP - 确保这个端口映射正确
+      - "8088:8088"
+      - "8089:8089"
+      - "8889:8889"
+      - "8000:8000"
+      - "7088:7088"
+      - "7089:7089"
     volumes:
       - ./dockers/config/janus.jcfg:/usr/local/etc/janus/janus.jcfg
-      - ./dockers/config/janus.plugin.sip.jcfg:/usr/local/etc/janus/janus.plugin.sip.jcfg
-      - ./dockers/config/janus.eventhandler.sampleevh.jcfg:/usr/local/etc/janus/janus.eventhandler.sampleevh.jcfg
-      - ./dockers/logs/janus:/var/log/janus
-    networks:
-      rtp-bridge:
-        aliases:
-          - janus-gateway
-        ipv4_address: 172.21.0.2 # 固定 IP 地址
-    restart: unless-stopped
-    environment:
-      - JANUS_API_SECRET=janusrocks
-      - JANUS_LOG_LEVEL=7
-      - JANUS_SIP_INTERFACE=0.0.0.0 # 监听所有接口
-      - JANUS_DEBUG_LEVEL=7 # 最详细的日志级别
-    healthcheck:
-      test: [ "CMD", "pgrep", "janus" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      - ./dockers/config/janus.eventhandler.sampleevh.jcfg:/usr/local/etc/janus/janus.eventhandler.sampleevh.jcfg"
+    restart: always
 
   # MySQL Database
   mysql:
@@ -54,8 +31,6 @@ services:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
-    networks:
-      - rtp-bridge
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       interval: 30s
@@ -70,8 +45,6 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    networks:
-      - rtp-bridge
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 30s
@@ -83,10 +56,3 @@ volumes:
   redis_data:
 
 
-networks:
-  rtp-bridge:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.21.0.0/16
-          gateway: 172.21.0.1

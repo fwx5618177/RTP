@@ -4,115 +4,254 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// 创建 UDP socket
-$socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
-if (!$socket) {
-    die("Failed to create socket: " . socket_strerror(socket_last_error()) . "\n");
-}
+// 获取本机IP地址
+$host_ip = '127.0.0.1';
+echo "Host IP: $host_ip\n";
 
-// 设置更长的超时时间 (10秒)
-socket_set_option($socket, SOL_SOCKET, SO_RCVTIMEO, array('sec' => 10, 'usec' => 0));
-socket_set_option($socket, SOL_SOCKET, SO_SNDTIMEO, array('sec' => 10, 'usec' => 0));
+// Janus HTTP API 端点和认证信息
+$janus_http_endpoint = 'http://127.0.0.1:8088/janus';
+$janus_api_secret = 'janusrocks';
 
-// 设置更大的缓冲区
-socket_set_option($socket, SOL_SOCKET, SO_RCVBUF, 65535);
-socket_set_option($socket, SOL_SOCKET, SO_SNDBUF, 65535);
+try {
+    echo "\n=== 创建 Janus 会话 ===\n";
+    $createSession = [
+        "janus" => "create",
+        "transaction" => generateTransactionId(),
+        "apisecret" => $janus_api_secret
+    ];
 
-// 允许地址重用
-socket_set_option($socket, SOL_SOCKET, SO_REUSEADDR, 1);
+    $response = sendRequest($janus_http_endpoint, $createSession);
+    if (!isset($response['data']['id'])) {
+        throw new Exception("Failed to create Janus session: " . json_encode($response));
+    }
 
-// 绑定到特定的本地地址和端口
-$local_ip = '0.0.0.0';
-$local_port = 0; // 让系统分配端口
+    $sessionId = $response['data']['id'];
+    echo "Created Janus session: $sessionId\n";
 
-if (!socket_bind($socket, $local_ip, $local_port)) {
-    die("Failed to bind socket: " . socket_strerror(socket_last_error($socket)) . "\n");
-}
+    echo "\n=== 附加到 AudioBridge 插件 ===\n";
+    $attachPlugin = [
+        "janus" => "attach",
+        "plugin" => "janus.plugin.audiobridge",
+        "transaction" => generateTransactionId(),
+        "apisecret" => $janus_api_secret
+    ];
 
-// 获取本地绑定的端口
-socket_getsockname($socket, $local_ip, $local_port);
-echo "Local socket bound to $local_ip:$local_port\n";
+    $response = sendRequest("$janus_http_endpoint/$sessionId", $attachPlugin);
+    if (!isset($response['data']['id'])) {
+        throw new Exception("Failed to attach to AudioBridge plugin: " . json_encode($response));
+    }
 
-// 获取容器名称和网络信息
-$container_name = 'rtp-bridge-janus';
-echo "Looking for container: $container_name\n";
+    $handleId = $response['data']['id'];
+    echo "Attached to AudioBridge plugin: $handleId\n";
 
-// 使用 Docker CLI 获取容器 IP
-$container_ip = trim(shell_exec("docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $container_name"));
-if (empty($container_ip)) {
-    die("Failed to get container IP address\n");
-}
+    // 创建音频房间
+    echo "\n=== 创建音频房间 ===\n";
+    $roomId = rand(1000000, 9999999);
+    $createRoom = [
+        "janus" => "message",
+        "body" => [
+            "request" => "create",
+            "room" => $roomId,
+            "description" => "Test Audio Room",
+            "secret" => "roomsecret",
+            "sampling_rate" => 16000,
+            "spatial_audio" => false,
+            "record" => false,
+            "permanent" => false
+        ],
+        "transaction" => generateTransactionId(),
+        "apisecret" => $janus_api_secret
+    ];
 
-echo "Container IP: $container_ip\n";
+    $response = sendRequest("$janus_http_endpoint/$sessionId/$handleId", $createRoom);
+    echo "Create room response: " . json_encode($response, JSON_PRETTY_PRINT) . "\n";
 
-// Janus 服务器地址
-$janus_ip = $container_ip;  // 使用容器实际 IP
-$janus_port = 5060;        // SIP 端口
+    // 模拟第一个参与者（创建者）加入房间
+    echo "\n=== 参与者1加入房间 ===\n";
+    $participant1 = [
+        "janus" => "message",
+        "body" => [
+            "request" => "join",
+            "room" => $roomId,
+            "display" => "Participant 1",
+            "muted" => false
+        ],
+        "transaction" => generateTransactionId(),
+        "apisecret" => $janus_api_secret
+    ];
 
-// 尝试 ping Janus 服务器
-echo "Attempting to ping $janus_ip...\n";
-exec("ping -c 1 $janus_ip", $ping_output, $ping_result);
-echo "Ping result: " . ($ping_result === 0 ? "Success" : "Failed") . "\n";
-echo "Ping output: " . implode("\n", $ping_output) . "\n\n";
+    $response = sendRequest("$janus_http_endpoint/$sessionId/$handleId", $participant1);
+    echo "Participant 1 join response: " . json_encode($response, JSON_PRETTY_PRINT) . "\n";
 
-// 构造一个简单的 SIP OPTIONS 请求
-$branch = 'z9hG4bK' . rand(1000000, 9999999);
-$tag = rand(1000000, 9999999);
-$call_id = rand(1000000, 9999999);
+    // 为第二个参与者创建新的句柄
+    echo "\n=== 创建参与者2的句柄 ===\n";
+    $response = sendRequest("$janus_http_endpoint/$sessionId", $attachPlugin);
+    $handleId2 = $response['data']['id'];
+    echo "Created handle for participant 2: $handleId2\n";
 
-$sip_request = "OPTIONS sip:janus@$janus_ip:$janus_port SIP/2.0\r\n"
-    . "Via: SIP/2.0/UDP $local_ip:$local_port;branch=$branch\r\n"
-    . "From: <sip:test@$local_ip:$local_port>;tag=$tag\r\n"
-    . "To: <sip:janus@$janus_ip:$janus_port>\r\n"
-    . "Call-ID: {$call_id}@$local_ip\r\n"
-    . "CSeq: 1 OPTIONS\r\n"
-    . "Contact: <sip:test@$local_ip:$local_port>\r\n"
-    . "Max-Forwards: 70\r\n"
-    . "User-Agent: PHP SIP Test\r\n"
-    . "Accept: application/sdp\r\n"
-    . "Content-Length: 0\r\n\r\n";
+    // 第二个参与者加入房间
+    echo "\n=== 参与者2加入房间 ===\n";
+    $participant2 = [
+        "janus" => "message",
+        "body" => [
+            "request" => "join",
+            "room" => $roomId,
+            "display" => "Participant 2",
+            "muted" => false
+        ],
+        "transaction" => generateTransactionId(),
+        "apisecret" => $janus_api_secret
+    ];
 
-echo "Sending SIP OPTIONS request to $janus_ip:$janus_port...\n";
-echo "Request:\n$sip_request\n";
+    $response = sendRequest("$janus_http_endpoint/$sessionId/$handleId2", $participant2);
+    echo "Participant 2 join response: " . json_encode($response, JSON_PRETTY_PRINT) . "\n";
 
-// 发送请求
-$result = socket_sendto($socket, $sip_request, strlen($sip_request), 0, $janus_ip, $janus_port);
-if ($result === false) {
-    die("Failed to send request: " . socket_strerror(socket_last_error($socket)) . "\n");
-}
+    // 模拟音频配置
+    echo "\n=== 配置参与者1的音频 ===\n";
+    $participant1Audio = [
+        "janus" => "message",
+        "body" => [
+            "request" => "configure",
+            "muted" => false,
+            "quality" => 1.0
+        ],
+        "transaction" => generateTransactionId(),
+        "apisecret" => $janus_api_secret
+    ];
 
-echo "Sent $result bytes\n";
-echo "Waiting for response...\n";
+    $response = sendRequest("$janus_http_endpoint/$sessionId/$handleId", $participant1Audio);
+    echo "Participant 1 audio config response: " . json_encode($response, JSON_PRETTY_PRINT) . "\n";
 
-// 接收响应
-$response = '';
-$from = '';
-$port = 0;
+    // 列出房间参与者
+    echo "\n=== 获取房间参与者列表 ===\n";
+    $listParticipants = [
+        "janus" => "message",
+        "body" => [
+            "request" => "listparticipants",
+            "room" => $roomId
+        ],
+        "transaction" => generateTransactionId(),
+        "apisecret" => $janus_api_secret
+    ];
 
-// 循环尝试接收几次
-for ($i = 0; $i < 3; $i++) {
-    echo "Attempt " . ($i + 1) . " to receive response...\n";
-    $result = socket_recvfrom($socket, $response, 65535, 0, $from, $port);
+    $response = sendRequest("$janus_http_endpoint/$sessionId/$handleId", $listParticipants);
+    echo "Room participants: " . json_encode($response, JSON_PRETTY_PRINT) . "\n";
 
-    if ($result === false) {
-        $error_code = socket_last_error($socket);
-        echo "Receive failed: " . socket_strerror($error_code) . " (Error code: $error_code)\n";
+    // 模拟音频会话持续一段时间
+    echo "\n=== 音频会话进行中 ===\n";
+    sleep(5);
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+} finally {
+    // 清理资源
+    if (isset($handleId2) && isset($sessionId)) {
+        echo "\n=== 参与者2离开房间 ===\n";
+        $leaveRoom2 = [
+            "janus" => "message",
+            "body" => [
+                "request" => "leave"
+            ],
+            "transaction" => generateTransactionId(),
+            "apisecret" => $janus_api_secret
+        ];
+        sendRequest("$janus_http_endpoint/$sessionId/$handleId2", $leaveRoom2);
+    }
 
-        if ($i < 2) {
-            echo "Waiting 2 seconds before next attempt...\n";
-            sleep(2);
-            continue;
-        }
-    } else {
-        echo "\nReceived response from $from:$port\n";
-        echo "Response:\n$response\n";
-        break;
+    if (isset($handleId) && isset($sessionId)) {
+        echo "\n=== 参与者1离开房间 ===\n";
+        $leaveRoom1 = [
+            "janus" => "message",
+            "body" => [
+                "request" => "leave"
+            ],
+            "transaction" => generateTransactionId(),
+            "apisecret" => $janus_api_secret
+        ];
+        sendRequest("$janus_http_endpoint/$sessionId/$handleId", $leaveRoom1);
+
+        echo "\n=== 销毁房间 ===\n";
+        $destroyRoom = [
+            "janus" => "message",
+            "body" => [
+                "request" => "destroy",
+                "room" => $roomId,
+                "secret" => "roomsecret"
+            ],
+            "transaction" => generateTransactionId(),
+            "apisecret" => $janus_api_secret
+        ];
+        sendRequest("$janus_http_endpoint/$sessionId/$handleId", $destroyRoom);
+    }
+
+    // 清理句柄和会话
+    if (isset($handleId2) && isset($sessionId)) {
+        $detach2 = [
+            "janus" => "detach",
+            "transaction" => generateTransactionId(),
+            "apisecret" => $janus_api_secret
+        ];
+        sendRequest("$janus_http_endpoint/$sessionId/$handleId2", $detach2);
+    }
+
+    if (isset($handleId) && isset($sessionId)) {
+        $detach = [
+            "janus" => "detach",
+            "transaction" => generateTransactionId(),
+            "apisecret" => $janus_api_secret
+        ];
+        sendRequest("$janus_http_endpoint/$sessionId/$handleId", $detach);
+    }
+
+    if (isset($sessionId)) {
+        $destroy = [
+            "janus" => "destroy",
+            "transaction" => generateTransactionId(),
+            "apisecret" => $janus_api_secret
+        ];
+        sendRequest("$janus_http_endpoint/$sessionId", $destroy);
     }
 }
 
-// 关闭 socket
-socket_close($socket);
+function generateTransactionId()
+{
+    return "txid" . rand(1000000, 9999999);
+}
 
-// 显示 Docker 容器信息
-echo "\nDocker Container Info:\n";
-echo "--------------------\n";
+function sendRequest($url, $data = [], $method = 'POST')
+{
+    $ch = curl_init($url);
+
+    $options = [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_CONNECTTIMEOUT => 5
+    ];
+
+    if ($method === 'POST') {
+        $options[CURLOPT_POST] = true;
+        $options[CURLOPT_POSTFIELDS] = json_encode($data);
+    }
+
+    curl_setopt_array($ch, $options);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+    if ($response === false) {
+        throw new Exception('Curl error: ' . curl_error($ch));
+    }
+
+    curl_close($ch);
+
+    if ($httpCode >= 400) {
+        throw new Exception("HTTP error $httpCode: $response");
+    }
+
+    $decoded = json_decode($response, true);
+    if ($decoded === null) {
+        throw new Exception("Invalid JSON response: $response");
+    }
+
+    return $decoded;
+}
