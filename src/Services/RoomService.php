@@ -11,8 +11,8 @@ use App\Logs\Logger;
 use App\Repository\RoomRepository;
 use App\Utils\Container;
 use App\Validator\Validator;
-use Ramsey\Uuid\Uuid;
 use App\Media\MediaManager;
+use Ramsey\Uuid\Uuid;
 
 class RoomService extends BaseService
 {
@@ -27,18 +27,16 @@ class RoomService extends BaseService
         parent::__construct();
         $this->logger = Container::getInstance()->get(Logger::class);
         $this->mediaManager = new MediaManager();
-
-        $this->roomRepository = $roomRepository;
-        $this->validator = $validator;
-        $this->redisService = $redisService;
     }
 
     public function createRoom(RoomDTO $roomDTO): RoomEntity
     {
         try {
-            $this->logger->info('Starting room creation', ['roomName' =>
-            $roomDTO->getRoomName()]);
-            // Validate DTO
+            $this->logger->info('Starting room creation', [
+                'roomName' => $roomDTO->getRoomName()
+            ]);
+
+            // 验证输入
             $data = [
                 'roomName' => $roomDTO->getRoomName(),
                 'config' => $roomDTO->getConfig(),
@@ -51,136 +49,93 @@ class RoomService extends BaseService
 
             $this->validator->validate($data, $rules);
 
-            // Generate room ID
-            $roomId = $this->generateRoomId();
-
-            // 创建媒体会话
-            $sessionInfo = $this->mediaManager->createMediaSession(
+            // 创建音频房间
+            $mediaInfo = $this->mediaManager->createAudioRoom(
                 $roomDTO->getRoomName(),
                 $roomDTO->getUserId()
             );
 
-            // 创建房间实体
-            $room = new RoomEntity(
-                $sessionInfo['roomId'],
+            // 保存到数据库
+            $roomEntity = new RoomEntity(
+                $this->generateRoomId(),
                 $roomDTO->getRoomName(),
                 array_merge($roomDTO->getConfig(), [
-                    'mediaInfo' => $sessionInfo['mediaInfo'],
-                    'ip' => $sessionInfo['ip'],
-                    'timestamp' => $sessionInfo['timestamp']
+                    'janus' => [
+                        'roomId' => $mediaInfo['roomId'],
+                        'sessionId' => $mediaInfo['sessionId'],
+                        'handleId' => $mediaInfo['handleId'],
+                        'creator' => $roomDTO->getUserId()
+                    ]
                 ])
             );
 
-            // Save to MySQL
-            $room = $this->roomRepository->save($room);
+            $this->roomRepository->save($roomEntity);
 
-            // Initialize Redis data
-            $this->initializeRedisRoomData($room);
-
-            // Cache the room
-            $this->cacheRoom($room);
-
-            $this->logger->info('Room created successfully', [
-                'roomId' => $room->getRoomId(),
-                'roomName' => $room->getRoomName(),
-                'config' => $room->getConfig()
+            // 保存到 Redis
+            $this->redisService->hSet("room:{$roomEntity->getRoomId()}:metadata", [
+                'name' => $roomEntity->getRoomName(),
+                'creator' => $roomDTO->getUserId(),
+                'janus_room_id' => $mediaInfo['roomId'],
+                'created_at' => time(),
+                'status' => 'active'
             ]);
 
-            return $room;
+            // 添加创建者到参与者列表
+            $this->redisService->sAdd(
+                "room:{$roomEntity->getRoomId()}:participants",
+                [$roomDTO->getUserId()]
+            );
+
+            return $roomEntity;
         } catch (\Exception $e) {
-            $this->logger->error('Failed to create room', [
+            $this->logger->error('Error in createRoom', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new RoomException('Failed to create room: ' . $e->getMessage());
+            throw $e;
         }
-    }
-
-    private function initializeRedisRoomData(RoomEntity $room): void
-    {
-        $roomId = $room->getRoomId();
-
-        // Set room metadata
-        $this->redisService->hSet(
-            "room:$roomId:metadata",
-            [
-                'created_at' => $room->getCreatedAt()->format('Y-m-d H:i:s'),
-                'config' => json_encode($room->getConfig()),
-                'status' => 'active',
-            ]
-        );
-
-        // Initialize participants set
-        $this->redisService->sAdd("room:$roomId:participants", [$room->getRoomName()]);
-    }
-
-    private function cacheRoom(RoomEntity $room): void
-    {
-        $roomData = [
-            'id' => $room->getId(),
-            'roomId' => $room->getRoomId(),
-            'name' => $room->getRoomName(),
-            // ... other fields
-        ];
-
-        $this->redisService->set("room:{$room->getRoomId()}", json_encode($roomData));
     }
 
     public function joinRoom(string $roomId, string $userId): array
     {
         try {
-            // Validate parameters
-            if (empty($roomId)) {
-                throw new RoomException('Room ID cannot be empty');
+            if (empty($roomId) || empty($userId)) {
+                throw new RoomException('Room ID and User ID are required');
             }
 
-            if (empty($userId)) {
-                throw new RoomException('User ID cannot be empty');
-            }
-
-            // Check if room exists in Redis
-            if (! $this->redisService->exists("room:$roomId:metadata")) {
+            // 检查房间是否存在
+            $metadata = $this->redisService->hGetAll("room:$roomId:metadata");
+            if (empty($metadata)) {
                 throw new RoomException('Room not found');
             }
 
-            // Check if user is already in the room
+            // 检查用户是否已在房间中
             if ($this->redisService->sIsMember("room:$roomId:participants", $userId)) {
-                $this->logger->info('User already in room', [
-                    'roomId' => $roomId,
-                    'userId' => $userId,
-                ]);
-
-                // Return current room state
                 return [
                     'roomId' => $roomId,
-                    'metadata' => $this->redisService->hGetAll("room:$roomId:metadata"),
-                    'participants' => $this->redisService->sMembers("room:$roomId:participants"),
+                    'metadata' => $metadata,
+                    'participants' => $this->redisService->sMembers("room:$roomId:participants")
                 ];
             }
-
-            // Add user to participants
+            // 加入房间
             $this->redisService->sAdd("room:$roomId:participants", [$userId]);
-
-            // Get room metadata
-            $metadata = $this->redisService->hGetAll("room:$roomId:metadata");
 
             $this->logger->info('User joined room', [
                 'roomId' => $roomId,
-                'userId' => $userId,
+                'userId' => $userId
             ]);
 
             return [
                 'roomId' => $roomId,
                 'metadata' => $metadata,
-                'participants' => $this->redisService->sMembers("room:$roomId:participants"),
+                'participants' => $this->redisService->sMembers("room:$roomId:participants")
             ];
         } catch (\Exception $e) {
             $this->logger->error('Error in joinRoom', [
-                'roomId' => $roomId,
-                'userId' => $userId,
                 'error' => $e->getMessage(),
+                'roomId' => $roomId,
+                'userId' => $userId
             ]);
-
             throw $e;
         }
     }
@@ -188,54 +143,50 @@ class RoomService extends BaseService
     public function leaveRoom(string $roomId, string $userId): void
     {
         try {
-            // Validate parameters
-            if (empty($roomId)) {
-                throw new RoomException('Room ID cannot be empty');
+            if (empty($roomId) || empty($userId)) {
+                throw new RoomException('Room ID and User ID are required');
             }
 
-            if (empty($userId)) {
-                throw new RoomException('User ID cannot be empty');
-            }
-
-            // Check if room exists in Redis
-            if (! $this->redisService->exists("room:$roomId:metadata")) {
+            // 检查房间是否存在
+            if (!$this->redisService->exists("room:$roomId:metadata")) {
                 throw new RoomException('Room not found');
             }
 
-            // Remove user from participants
+            // 从参与者列表中移除
             $this->redisService->sRem("room:$roomId:participants", $userId);
 
             $this->logger->info('User left room', [
                 'roomId' => $roomId,
-                'userId' => $userId,
+                'userId' => $userId
             ]);
 
-            // Check if room is empty
+            // 检查房间是否为空
             $participantCount = $this->redisService->sCard("room:$roomId:participants");
             if ($participantCount === 0) {
                 $this->cleanupRoom($roomId);
             }
         } catch (\Exception $e) {
             $this->logger->error('Error in leaveRoom', [
-                'roomId' => $roomId,
-                'userId' => $userId,
                 'error' => $e->getMessage(),
+                'roomId' => $roomId,
+                'userId' => $userId
             ]);
-
             throw $e;
         }
     }
 
     private function cleanupRoom(string $roomId): void
     {
-        // Delete Redis keys
+        // 删除 Redis 数据
         $this->redisService->del([
             "room:$roomId:metadata",
-            "room:$roomId:participants",
+            "room:$roomId:participants"
         ]);
-
-        // Delete from MySQL
-        $this->roomRepository->deleteRoom($roomId);
+        // 从数据库中删除
+        $room = $this->roomRepository->find($roomId);
+        if ($room) {
+            $this->roomRepository->delete($room);
+        }
     }
 
     private function generateRoomId(): string
@@ -243,17 +194,24 @@ class RoomService extends BaseService
         return Uuid::uuid4()->toString();
     }
 
-    public function handleSipCall(array $sipHeaders, string $roomId): void
+    public function findRoom(string $roomId): ?RoomEntity
     {
-        // Check if room exists
-        if (! $this->redisService->exists("room:$roomId:metadata")) {
-            throw new RoomException('Room not found');
+        try {
+            // 先从 Redis 获取
+            $metadata = $this->redisService->hGetAll("room:$roomId:metadata");
+            if (empty($metadata)) {
+                // 如果 Redis 没有，从数据库查询
+                return $this->roomRepository->find($roomId);
+            }
+
+            // 从数据库获取完整信息
+            return $this->roomRepository->find($roomId);
+        } catch (\Exception $e) {
+            $this->logger->error('Error in findRoom', [
+                'error' => $e->getMessage(),
+                'roomId' => $roomId
+            ]);
+            throw $e;
         }
-
-        // Add SIP participant
-        $sipId = $sipHeaders['X-Conference-Server'] . ':' . $sipHeaders['X-Conference-Room'];
-        $this->redisService->sAdd("room:$roomId:participants", [$sipId]);
-
-        // TODO: Implement RTP bridge to Janus
     }
 }

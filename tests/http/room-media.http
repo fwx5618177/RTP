@@ -104,3 +104,62 @@ Content-Type: application/json
   "roomId": "{{roomId}}",
   "userId": "sip:user2@sip.example.com"
 }
+
+### Create audio room
+# @name createAudioRoom
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user123",
+    "roomName": "audio_test_room",
+    "config": {
+        "maxParticipants": 10,
+        "audioEnabled": true,
+        "videoEnabled": false,
+        "audioConfig": {
+            "sampleRate": 16000,
+            "channels": 1,
+            "codec": "opus"
+        }
+    }
+}
+
+### Get audio room status
+@audioRoomId = {{createAudioRoom.response.body.roomId}}
+GET http://{{host}}/api/rooms/{{audioRoomId}}/status
+Content-Type: application/json
+
+### Join audio room
+POST http://{{host}}/api/rooms/join
+Content-Type: application/json
+
+{
+    "roomId": "{{audioRoomId}}",
+    "userId": "participant123",
+    "display": "Test User"
+}
+
+### Get audio room participants
+GET http://{{host}}/api/rooms/{{audioRoomId}}/participants
+
+### Configure participant audio
+POST http://{{host}}/api/rooms/{{audioRoomId}}/configure
+Content-Type: application/json
+
+{
+    "userId": "participant123",
+    "audio": {
+        "muted": false,
+        "quality": 1.0
+    }
+}
+
+### Leave audio room
+POST http://{{host}}/api/rooms/leave
+Content-Type: application/json
+
+{
+    "roomId": "{{audioRoomId}}",
+    "userId": "participant123"
+}

@@ -60,6 +60,10 @@ class RoomController extends BaseController
                 'createdAt' => $room->getCreatedAt()->format('c'),
             ]);
 
+            // 获取房间配置中的 Janus 信息
+            $config = $room->getConfig();
+            $janusInfo = $config['janus'] ?? [];
+
             return (new Response())
                 ->setStatusCode(201)
                 ->setBody([
@@ -68,6 +72,11 @@ class RoomController extends BaseController
                     'config' => $room->getConfig(),
                     'userId' => $roomDTO->getUserId(),
                     'roomName' => $roomDTO->getRoomName(),
+                    'mediaSession' => [
+                        'janusRoomId' => $janusInfo['roomId'] ?? null,
+                        'sessionId' => $janusInfo['sessionId'] ?? null,
+                        'handleId' => $janusInfo['handleId'] ?? null
+                    ]
                 ]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to create room', [
@@ -172,26 +181,52 @@ class RoomController extends BaseController
     private function handleSipCall(Request $request, string $roomId, string $userId): Response
     {
         try {
+            // 获取 SIP 头信息
             $sipHeaders = [
                 'X-Conference-Room' => $request->getHeader('X-Conference-Room'),
                 'X-Conference-Server' => $request->getHeader('X-Conference-Server')
             ];
 
-            // Call RoomService to handle SIP call
-            $this->roomService->handleSipCall($sipHeaders, $roomId);
+            // 验证必要的 SIP 头
+            if (empty($sipHeaders['X-Conference-Room']) || empty($sipHeaders['X-Conference-Server'])) {
+                return (new Response())
+                    ->setStatusCode(400)
+                    ->setBody(['error' => 'Missing required SIP headers']);
+            }
+
+            // 获取房间信息
+            $room = $this->roomService->findRoom($roomId);
+            if (!$room) {
+                return (new Response())
+                    ->setStatusCode(404)
+                    ->setBody(['error' => 'Room not found']);
+            }
+
+            // 加入房间（使用特殊的 SIP 用户标识）
+            $sipUserId = "sip:{$userId}@{$sipHeaders['X-Conference-Server']}";
+            $joinResult = $this->roomService->joinRoom($roomId, $sipUserId);
+
+            // 记录 SIP 呼叫信息
+            $this->logger->info('SIP call routed', [
+                'roomId' => $roomId,
+                'sipUserId' => $sipUserId,
+                'headers' => $sipHeaders
+            ]);
 
             return (new Response())
                 ->setStatusCode(200)
                 ->setBody([
                     'message' => 'SIP call routed successfully',
                     'roomId' => $roomId,
-                    'userId' => $userId,
-                    'sipHeaders' => $sipHeaders
+                    'sipUserId' => $sipUserId,
+                    'joinResult' => $joinResult
                 ]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to handle SIP call', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
+                'roomId' => $roomId,
+                'userId' => $userId
             ]);
 
             return (new Response())

@@ -23,6 +23,8 @@ class MediaManager
     private Logger $logger;
     private Config $config;
     private JanusGateway $janusGateway;
+    private ?string $sessionId = null;
+    private ?string $handleId = null;
 
     /**
      * 默认的音频编解码器配置
@@ -194,6 +196,85 @@ class MediaManager
                 'sdpAnswer' => $sdpAnswer
             ]);
             throw new MediaException('Failed to parse SDP answer: ' . $e->getMessage());
+        }
+    }
+
+    public function createAudioRoom(string $roomName, string $userId): array
+    {
+        try {
+            // 1. 创建 Janus 会话
+            $session = $this->janusGateway->createSession();
+            $this->sessionId = (string)$session['data']['id'];
+
+            // 2. 附加到 AudioBridge 插件
+            $handle = $this->janusGateway->attachPlugin($this->sessionId);
+            $this->handleId = (string)$handle['data']['id'];
+
+            // 3. 创建音频房间
+            $roomId = rand(1000000, 9999999);
+            $roomConfig = [
+                "room" => $roomId,
+                "description" => $roomName,
+                "secret" => "room_" . $roomId,
+                "sampling_rate" => 16000,
+                "record" => false,
+                "notify_joining" => true
+            ];
+
+            $response = $this->janusGateway->createRoom(
+                $this->sessionId,
+                $this->handleId,
+                $roomConfig
+            );
+
+            return [
+                'roomId' => $roomId,
+                'sessionId' => $this->sessionId,
+                'handleId' => $this->handleId,
+                'config' => $roomConfig,
+                'janusResponse' => $response
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to create audio room', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new MediaException('Failed to create audio room: ' . $e->getMessage());
+        }
+    }
+
+    public function joinAudioRoom(int $roomId, string $userId, string $display): array
+    {
+        try {
+            if (!$this->sessionId) {
+                $session = $this->janusGateway->createSession();
+                $this->sessionId = (string)$session['data']['id'];
+            }
+
+            if (!$this->handleId) {
+                $handle = $this->janusGateway->attachPlugin($this->sessionId);
+                $this->handleId = (string)$handle['data']['id'];
+            }
+
+            $response = $this->janusGateway->joinRoom(
+                $this->sessionId,
+                $this->handleId,
+                $roomId,
+                $display
+            );
+
+            return [
+                'roomId' => $roomId,
+                'sessionId' => $this->sessionId,
+                'handleId' => $this->handleId,
+                'janusResponse' => $response
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to join audio room', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new MediaException('Failed to join audio room: ' . $e->getMessage());
         }
     }
 }
