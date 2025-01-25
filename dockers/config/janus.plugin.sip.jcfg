@@ -1,0 +1,14 @@
+general: {
+    # Janus SIP 插件的常规配置
+    local_ip = "172.21.0.2"    # 使用容器内部 IP
+    local_port = 5060       # SIP 端口
+    register_ttl = 3600     # 注册超时时间
+    behind_nat = true       # 启用 NAT 穿透
+    sip_timer_t1 = 500     # SIP 重传定时器
+    sip_timer_t2 = 4000    # SIP 重传间隔
+    sip_timer_t4 = 5000    # SIP 事务超时
+    debug_level = 7         # 最高日志级别
+    log_to_stdout = true    # 添加这行
+    log_to_file = true     # 添加这行
+    log_file = "/var/log/janus/janus-sip.log"  # 添加这行
+} 

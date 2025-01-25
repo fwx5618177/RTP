@@ -75,9 +75,7 @@ class RoomController extends BaseController
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return (new Response())
-                ->setStatusCode(400)
-                ->setBody(['error' => $e->getMessage()]);
+            return $this->errorResponse($e->getMessage(), 400);
         }
     }
 

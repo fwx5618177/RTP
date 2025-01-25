@@ -1,3 +1,4 @@
+# General configuration
 general: {
   enabled = true
   json = "indented"
@@ -15,6 +16,14 @@ general: {
   log_max_size = "10M"
   log_max_files = 5
   log_rotate = true
+  debug_level = 7
+  debug_timestamps = true
+  debug_colors = true
+  interface = "0.0.0.0"
+  session_timeout = 60
+  plugins_folder = "/usr/local/lib/janus/plugins"
+  transports_folder = "/usr/local/lib/janus/transports"
+  events_folder = "/usr/local/lib/janus/events"
 }
 
 plugins: {
@@ -28,4 +37,11 @@ transports: {
 media: {
   rtp_port_range = "10000-20000"
   nat_1_1_mapping = "1.2.3.4"
+  dtls_mtu = 1200
+}
+
+nat: {
+  ice_lite = true
+  ice_tcp = false
+  nice_debug = false
 }

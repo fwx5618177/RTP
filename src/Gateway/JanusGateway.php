@@ -16,7 +16,8 @@ use RTCKit\SIP\Header\{
     ScalarHeader,
     CallIdHeader,
     CSeqHeader,
-    SingleValueWithParamsHeader
+    SingleValueWithParamsHeader,
+    ViaValue
 };
 
 class JanusGateway
@@ -35,6 +36,36 @@ class JanusGateway
         if (!$this->socket) {
             throw new GatewayException('Failed to create socket');
         }
+
+        // 设置接收超时
+        socket_set_option($this->socket, SOL_SOCKET, SO_RCVTIMEO, [
+            'sec' => 5,  // 5 秒超时
+            'usec' => 0
+        ]);
+
+        // 设置发送超时
+        socket_set_option($this->socket, SOL_SOCKET, SO_SNDTIMEO, [
+            'sec' => 5,
+            'usec' => 0
+        ]);
+
+        // 绑定到本地任意地址
+        if (!socket_bind($this->socket, '0.0.0.0', 0)) {
+            $error = socket_last_error($this->socket);
+            $this->logger->error('Failed to bind socket', [
+                'error' => socket_strerror($error),
+                'ip' => '0.0.0.0'
+            ]);
+            throw new GatewayException('Failed to bind socket: ' . socket_strerror($error));
+        }
+
+        // 记录绑定信息
+        socket_getsockname($this->socket, $boundAddr, $boundPort);
+        $this->logger->debug('Socket bound successfully', [
+            'bound_addr' => $boundAddr,
+            'bound_port' => $boundPort,
+            'janus_host' => $this->config->get('JANUS_HOST')
+        ]);
     }
 
     /**
@@ -60,26 +91,34 @@ class JanusGateway
 
             // 创建并设置 SIP 消息头
             $via = new ViaHeader();
-            $via->values = [
-                'protocol' => 'SIP',
-                'version' => '2.0',
-                'transport' => 'UDP',
-                'host' => $this->config->get('JANUS_HOST'),
-                'branch' => 'z9hG4bK' . uniqid(),
-                'rport' => null,
-                'params' => [
-                    'branch' => 'z9hG4bK' . uniqid(),
-                    'rport' => null
-                ]
-            ];
+            $viaValue = new ViaValue();
+            $viaValue->protocol = 'SIP';
+            $viaValue->version = '2.0';
+            $viaValue->transport = 'UDP';
+            $viaValue->host = $this->config->get('JANUS_HOST');
+            $viaValue->branch = 'z9hG4bK' . uniqid();
+            $viaValue->rport = 0;  // 0 表示 ;rport 参数没有值
+            $via->values[] = $viaValue;
             $invite->via = $via;
 
+            // 创建 From URI
+            $fromUri = new URI();
+            $fromUri->scheme = 'sip';
+            $fromUri->user = $userId;
+            $fromUri->host = $this->config->get('JANUS_HOST');
+
             $from = new FromHeader();
-            $from->uri = new URI($fromUriStr);
+            $from->uri = $fromUri;
             $invite->from = $from;
 
+            // 创建 To URI
+            $toUri = new URI();
+            $toUri->scheme = 'sip';
+            $toUri->user = "room_{$roomName}";
+            $toUri->host = $this->config->get('JANUS_HOST');
+
             $to = new FromHeader();
-            $to->uri = new URI($toUriStr);
+            $to->uri = $toUri;
             $invite->to = $to;
 
             $callId = new CallIdHeader();
@@ -149,7 +188,23 @@ class JanusGateway
     private function sendRequest(Request $request): void
     {
         $message = $request->render();
-        socket_sendto(
+
+        // 获取本地 socket 信息
+        socket_getsockname($this->socket, $localAddr, $localPort);
+
+        $this->logger->debug('Sending SIP request', [
+            'message' => $message,
+            'host' => $this->config->get('JANUS_HOST'),
+            'port' => 5060,
+            'socket_info' => [
+                'local_addr' => $localAddr,
+                'local_port' => $localPort,
+                'remote_host' => gethostbyname($this->config->get('JANUS_HOST')),
+                'remote_port' => 5060
+            ]
+        ]);
+
+        $result = socket_sendto(
             $this->socket,
             $message,
             strlen($message),
@@ -157,21 +212,82 @@ class JanusGateway
             $this->config->get('JANUS_HOST'),
             5060
         );
+
+        if ($result === false) {
+            $errorCode = socket_last_error($this->socket);
+            throw new GatewayException(
+                'Failed to send request: ' . socket_strerror($errorCode)
+            );
+        }
     }
 
     private function waitForResponse(): ?Response
     {
-        $buf = '';
-        $from = '';
-        $port = 0;
+        $this->logger->debug('Waiting for SIP response...');
 
-        socket_recvfrom($this->socket, $buf, 65535, 0, $from, $port);
+        try {
+            $buf = '';
+            $from = '';
+            $port = 0;
+            $startTime = time();
+            $timeout = 60; // 5 秒超时
 
-        if (!empty($buf)) {
-            return Response::parse($buf);
+            while (time() - $startTime < $timeout) {
+                // 使用 select 检查 socket 是否可读
+                $read = [$this->socket];
+                $write = null;
+                $except = null;
+                $tv_sec = 1;
+                $tv_usec = 0;
+
+                $result = socket_select($read, $write, $except, $tv_sec, $tv_usec);
+
+                if ($result === false) {
+                    $errorCode = socket_last_error($this->socket);
+                    $errorMsg = socket_strerror($errorCode);
+                    $this->logger->error('Select failed', [
+                        'error' => $errorMsg,
+                        'code' => $errorCode
+                    ]);
+                    throw new GatewayException('Socket select failed: ' . $errorMsg);
+                }
+
+                if ($result > 0) {
+                    // 有数据可读
+                    $result = @socket_recvfrom($this->socket, $buf, 65535, 0, $from, $port);
+
+                    if ($result === false) {
+                        $errorCode = socket_last_error($this->socket);
+                        $errorMsg = socket_strerror($errorCode);
+                        $this->logger->error('Failed to receive response', [
+                            'error' => $errorMsg,
+                            'code' => $errorCode
+                        ]);
+                        throw new GatewayException('Failed to receive SIP response: ' . $errorMsg);
+                    }
+
+                    if (!empty($buf)) {
+                        $this->logger->debug('Received SIP response', [
+                            'from' => $from,
+                            'port' => $port,
+                            'response' => $buf
+                        ]);
+                        return Response::parse($buf);
+                    }
+                }
+            }
+
+            throw new GatewayException('Timeout waiting for SIP response');
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to receive SIP response', [
+                'error' => $e->getMessage()
+            ]);
+            throw new GatewayException(
+                'SIP communication failed',
+                500,
+                $e
+            );
         }
-
-        return null;
     }
 
     /**

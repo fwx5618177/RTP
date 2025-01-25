@@ -5,25 +5,41 @@ services:
   janus-gateway:
     container_name: rtp-bridge-janus
     image: canyan/janus-gateway:latest
-    command: [ "/usr/local/bin/janus", "-F", "/usr/local/etc/janus" ]
+    command: >
+      sh -c "apt-get update && 
+             apt-get install -y procps && 
+             /usr/local/bin/janus -F /usr/local/etc/janus"
+    tty: true
+    stdin_open: true
     ports:
-      - "8088:8088"
-      - "8089:8089"
-      - "8889:8889"
-      - "8000:8000"
-      - "7088:7088"
-      - "7089:7089"
-      - "5060:5060/udp"
+      - "8088:8088" # REST API
+      - "8089:8089" # HTTPS REST API
+      - "8889:8889" # WebSocket
+      - "8000:8000" # HTTPS WebSocket
+      - "7088:7088" # Admin API
+      - "7089:7089" # HTTPS Admin API
+      - "5060:5060/udp" # SIP UDP - 确保这个端口映射正确
     volumes:
       - ./dockers/config/janus.jcfg:/usr/local/etc/janus/janus.jcfg
+      - ./dockers/config/janus.plugin.sip.jcfg:/usr/local/etc/janus/janus.plugin.sip.jcfg
       - ./dockers/config/janus.eventhandler.sampleevh.jcfg:/usr/local/etc/janus/janus.eventhandler.sampleevh.jcfg
       - ./dockers/logs/janus:/var/log/janus
     networks:
-      - rtp-bridge
-    restart: always
+      rtp-bridge:
+        aliases:
+          - janus-gateway
+        ipv4_address: 172.21.0.2 # 固定 IP 地址
+    restart: unless-stopped
     environment:
       - JANUS_API_SECRET=janusrocks
-      - JANUS_LOG_LEVEL=4
+      - JANUS_LOG_LEVEL=7
+      - JANUS_SIP_INTERFACE=0.0.0.0 # 监听所有接口
+      - JANUS_DEBUG_LEVEL=7 # 最详细的日志级别
+    healthcheck:
+      test: [ "CMD", "pgrep", "janus" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # MySQL Database
   mysql:
@@ -70,3 +86,7 @@ volumes:
 networks:
   rtp-bridge:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1
