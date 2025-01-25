@@ -214,4 +214,44 @@ class RoomService extends BaseService
             throw $e;
         }
     }
+
+    /**
+     * 获取房间参与者数量
+     */
+    public function getParticipantsCount(string $roomId): int
+    {
+        return (int)$this->redisService->sCard("room:$roomId:participants");
+    }
+
+    /**
+     * 获取房间参与者列表
+     */
+    public function getRoomParticipants(string $roomId): array
+    {
+        try {
+            $participantIds = $this->redisService->sMembers("room:$roomId:participants");
+            $participants = [];
+
+            foreach ($participantIds as $userId) {
+                $participantData = $this->redisService->hGetAll("room:$roomId:participant:$userId");
+                if (!empty($participantData)) {
+                    $participants[] = [
+                        'userId' => $userId,
+                        'display' => $participantData['display'] ?? $userId,
+                        'joinedAt' => $participantData['joinedAt'] ?? null,
+                        'audioMuted' => (bool)($participantData['audioMuted'] ?? false),
+                        'isActive' => (bool)($participantData['isActive'] ?? true)
+                    ];
+                }
+            }
+
+            return $participants;
+        } catch (\Exception $e) {
+            $this->logger->error('Error getting room participants', [
+                'error' => $e->getMessage(),
+                'roomId' => $roomId
+            ]);
+            throw $e;
+        }
+    }
 }

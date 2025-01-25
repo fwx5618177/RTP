@@ -62,9 +62,16 @@ return function (Router $router) {
         'prefix' => '/api/rooms',
         'middleware' => [],
     ], function ($route) {
+        // 房间基本操作
         $route->add('POST', '/', [RoomController::class, 'createRoom']);
+        $route->add('GET', '/{roomId}', [RoomController::class, 'getRoomDetails']);
         $route->add('POST', '/join', [RoomController::class, 'joinRoom']);
         $route->add('POST', '/leave', [RoomController::class, 'leaveRoom']);
+
+        // 房间参与者
+        $route->add('GET', '/{roomId}/participants', [RoomController::class, 'getRoomParticipants']);
+
+        // SIP 相关
         $route->add('POST', '/sip', [RoomController::class, 'joinRoom']);
     });
 };

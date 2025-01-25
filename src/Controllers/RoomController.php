@@ -54,45 +54,46 @@ class RoomController extends BaseController
             }
         }
 
-        $roomDTO = new RoomDTO($data['userId'], $data['roomName'], $data['config'] ?? []);
-        $this->logger->debug('Created RoomDTO', ['dto' => [
-            'userId' => $roomDTO->getUserId(),
-            'roomName' => $roomDTO->getRoomName(),
-            'config' => $roomDTO->getConfig(),
-        ]]);
-
         try {
+            $roomDTO = new RoomDTO($data['userId'], $data['roomName'], $data['config'] ?? []);
             $room = $this->roomService->createRoom($roomDTO);
+
+            // 构建扁平化的返回数据结构
+            $responseData = [
+                'id' => $room->getRoomId(),
+                'name' => $room->getRoomName(),
+                'createdAt' => $room->getCreatedAt()->format('c'),
+                'creator' => $data['userId'],
+                'maxParticipants' => $data['config']['maxParticipants'] ?? 10,
+                'audioEnabled' => $data['config']['audioEnabled'] ?? true,
+                'videoEnabled' => $data['config']['videoEnabled'] ?? false,
+                'janusRoomId' => $room->getConfig()['janus']['roomId'],
+                'janusSessionId' => $room->getConfig()['janus']['sessionId'],
+                'janusHandleId' => $room->getConfig()['janus']['handleId']
+            ];
+
+            // 如果存在音频配置，添加到响应中
+            if (isset($data['config']['audioConfig'])) {
+                $responseData['sampleRate'] = $data['config']['audioConfig']['sampleRate'] ?? 16000;
+                $responseData['channels'] = $data['config']['audioConfig']['channels'] ?? 1;
+                $responseData['codec'] = $data['config']['audioConfig']['codec'] ?? 'opus';
+            }
+
             $this->logger->info('Room created successfully', [
                 'roomId' => $room->getRoomId(),
-                'createdAt' => $room->getCreatedAt()->format('c'),
+                'createdAt' => $room->getCreatedAt()->format('c')
             ]);
 
-            // 获取房间配置中的 Janus 信息
-            $config = $room->getConfig();
-            $janusInfo = $config['janus'] ?? [];
-
-            return (new Response())
-                ->setStatusCode(201)
-                ->setBody([
-                    'roomId' => $room->getRoomId(),
-                    'createdAt' => $room->getCreatedAt()->format('c'),
-                    'config' => $room->getConfig(),
-                    'userId' => $roomDTO->getUserId(),
-                    'roomName' => $roomDTO->getRoomName(),
-                    'mediaSession' => [
-                        'janusRoomId' => $janusInfo['roomId'] ?? null,
-                        'sessionId' => $janusInfo['sessionId'] ?? null,
-                        'handleId' => $janusInfo['handleId'] ?? null
-                    ]
-                ]);
+            return $this->successResponse($responseData, 201);
         } catch (\Exception $e) {
             $this->logger->error('Failed to create room', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'trace' => $e->getTraceAsString()
             ]);
 
-            return $this->errorResponse($e->getMessage(), 400);
+            return (new Response())
+                ->setStatusCode(500)
+                ->setBody(['error' => $e->getMessage()]);
         }
     }
 
@@ -205,9 +206,7 @@ class RoomController extends BaseController
             // 获取房间信息
             $room = $this->roomService->findRoom($roomId);
             if (!$room) {
-                return (new Response())
-                    ->setStatusCode(404)
-                    ->setBody(['error' => 'Room not found']);
+                return $this->errorResponse('Room not found, room id not found', 404);
             }
 
             // 加入房间（使用特殊的 SIP 用户标识）
@@ -291,5 +290,92 @@ class RoomController extends BaseController
         }
 
         return $errors;
+    }
+
+    /**
+     * 获取房间详情
+     */
+    public function getRoomDetails(Request $request, string $roomId): Response
+    {
+        try {
+            $room = $this->roomService->findRoom($roomId);
+
+            if (!$room) {
+                return $this->errorResponse('Room detail not found, room id not found', 404);
+            }
+
+            // 构建扁平化的返回数据
+            $responseData = [
+                'id' => $room->getRoomId(),
+                'name' => $room->getRoomName(),
+                'createdAt' => $room->getCreatedAt()->format('c'),
+                'creator' => $room->getConfig()['janus']['creator'],
+                'maxParticipants' => $room->getConfig()['maxParticipants'] ?? 10,
+                'audioEnabled' => $room->getConfig()['audioEnabled'] ?? true,
+                'videoEnabled' => $room->getConfig()['videoEnabled'] ?? false,
+                'janusRoomId' => $room->getConfig()['janus']['roomId'],
+                'participantsCount' => $this->roomService->getParticipantsCount($roomId)
+            ];
+
+            // 如果存在音频配置，添加到响应中
+            if (isset($room->getConfig()['audioConfig'])) {
+                $audioConfig = $room->getConfig()['audioConfig'];
+                $responseData['sampleRate'] = $audioConfig['sampleRate'] ?? 16000;
+                $responseData['channels'] = $audioConfig['channels'] ?? 1;
+                $responseData['codec'] = $audioConfig['codec'] ?? 'opus';
+            }
+
+            return (new Response())
+                ->setStatusCode(200)
+                ->setBody($responseData);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to get room details', [
+                'error' => $e->getMessage(),
+                'roomId' => $roomId
+            ]);
+
+            return $this->errorResponse('Failed to get room details', 500);
+        }
+    }
+
+    /**
+     * 获取房间参与者列表
+     */
+    public function getRoomParticipants(Request $request, string $roomId): Response
+    {
+        try {
+            $room = $this->roomService->findRoom($roomId);
+
+            if (!$room) {
+                return $this->errorResponse('Room participants not found, room id not found', 404);
+            }
+
+            $participants = $this->roomService->getRoomParticipants($roomId);
+
+            return (new Response())
+                ->setStatusCode(200)
+                ->setBody([
+                    'roomId' => $roomId,
+                    'count' => count($participants),
+                    'participants' => array_map(function ($participant) {
+                        return [
+                            'userId' => $participant['userId'],
+                            'display' => $participant['display'],
+                            'joinedAt' => $participant['joinedAt'],
+                            'audioMuted' => $participant['audioMuted'] ?? false,
+                            'isActive' => $participant['isActive'] ?? true
+                        ];
+                    }, $participants)
+                ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to get room participants', [
+                'error' => $e->getMessage(),
+                'roomId' => $roomId
+            ]);
+
+            return (new Response())
+                ->setStatusCode(500)
+                ->setBody(['error' => 'Failed to get room participants']);
+        }
     }
 }

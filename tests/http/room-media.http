@@ -23,7 +23,7 @@ Content-Type: application/json
 }
 
 ### Get room details
-@roomId = {{createRoom.response.body.roomId}}
+@roomId = {{createRoom.response.body.id}}
 GET http://{{host}}/api/rooms/{{roomId}}
 
 ### Get room participants
@@ -93,29 +93,7 @@ Content-Type: application/json
     }
 }
 
-### 3. SIP 集成测试 ###
-
-### Join room with SIP headers
-POST http://{{host}}/api/rooms/sip
-Content-Type: application/json
-X-Conference-Room: 12345
-X-Conference-Server: sip.example.com
-
-{
-    "roomId": "{{roomId}}",
-    "userId": "sip:user2@sip.example.com"
-}
-
-### Leave room (SIP user)
-POST http://{{host}}/api/rooms/leave
-Content-Type: application/json
-
-{
-    "roomId": "{{roomId}}",
-    "userId": "sip:user2@sip.example.com"
-}
-
-### 4. 音频配置测试 ###
+### 3. 音频配置测试 ###
 
 ### Configure participant audio
 POST http://{{host}}/api/rooms/{{roomId}}/configure
