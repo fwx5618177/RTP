@@ -29,10 +29,9 @@ class RoomController extends BaseController
         $data = $request->getBodyParams();
         $this->logger->info('Creating room with data', ['data' => $data]);
 
-        // 添加参数验证
+        // 基本参数验证
         if (empty($data['userId'])) {
             $this->logger->warning('userId is required but was empty');
-
             return (new Response())
                 ->setStatusCode(400)
                 ->setBody(['error' => 'userId is required']);
@@ -40,10 +39,19 @@ class RoomController extends BaseController
 
         if (empty($data['roomName'])) {
             $this->logger->warning('roomName is required but was empty');
-
             return (new Response())
                 ->setStatusCode(400)
                 ->setBody(['error' => 'roomName is required']);
+        }
+
+        // 配置验证
+        if (isset($data['config'])) {
+            $configErrors = $this->validateRoomConfig($data['config']);
+            if (!empty($configErrors)) {
+                return (new Response())
+                    ->setStatusCode(400)
+                    ->setBody(['error' => 'Invalid configuration', 'details' => $configErrors]);
+            }
         }
 
         $roomDTO = new RoomDTO($data['userId'], $data['roomName'], $data['config'] ?? []);
@@ -233,5 +241,55 @@ class RoomController extends BaseController
                 ->setStatusCode(500)
                 ->setBody(['error' => $e->getMessage()]);
         }
+    }
+
+    private function validateRoomConfig(array $config): array
+    {
+        $errors = [];
+
+        // 验证最大参与者数
+        if (isset($config['maxParticipants'])) {
+            if (!is_int($config['maxParticipants']) || $config['maxParticipants'] <= 0) {
+                $errors[] = 'maxParticipants must be a positive integer';
+            }
+            if ($config['maxParticipants'] > 100) { // 设置上限
+                $errors[] = 'maxParticipants cannot exceed 100';
+            }
+        }
+
+        // 验证音频配置
+        if (isset($config['audioEnabled'])) {
+            if (!is_bool($config['audioEnabled'])) {
+                $errors[] = 'audioEnabled must be a boolean value';
+            }
+        }
+
+        // 验证视频配置
+        if (isset($config['videoEnabled'])) {
+            if (!is_bool($config['videoEnabled'])) {
+                $errors[] = 'videoEnabled must be a boolean value';
+            }
+        }
+
+        // 验证音频配置详情
+        if (isset($config['audioConfig'])) {
+            if (!is_array($config['audioConfig'])) {
+                $errors[] = 'audioConfig must be an object';
+            } else {
+                if (isset($config['audioConfig']['sampleRate'])) {
+                    $validSampleRates = [8000, 16000, 32000, 44100, 48000];
+                    if (!in_array($config['audioConfig']['sampleRate'], $validSampleRates)) {
+                        $errors[] = 'Invalid sample rate. Must be one of: ' . implode(', ', $validSampleRates);
+                    }
+                }
+                if (isset($config['audioConfig']['channels'])) {
+                    if (!in_array($config['audioConfig']['channels'], [1, 2])) {
+                        $errors[] = 'Channels must be either 1 (mono) or 2 (stereo)';
+                    }
+                }
+            }
+        }
+
+        return $errors;
     }
 }

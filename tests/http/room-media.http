@@ -1,5 +1,7 @@
 @host = localhost:9501
 
+### 1. 基本房间操作测试 ###
+
 ### Create room with audio only
 # @name createRoom
 POST http://{{host}}/api/rooms
@@ -8,111 +10,6 @@ Content-Type: application/json
 {
     "userId": "user123",
     "roomName": "test_room",
-    "config": {
-        "maxParticipants": 10,
-        "audioEnabled": true,
-        "videoEnabled": false
-    }
-}
-
-### Create room with invalid configuration
-POST http://{{host}}/api/rooms
-Content-Type: application/json
-
-{
-    "userId": "user123",
-    "roomName": "test_room",
-    "config": {
-        "maxParticipants": -1,
-        "audioEnabled": true
-    }
-}
-
-### Create room with duplicate name
-@roomId = {{createRoom.response.body.roomId}}
-POST http://{{host}}/api/rooms
-Content-Type: application/json
-
-{
-    "userId": "user456",
-    "roomName": "test_room",
-    "config": {
-        "maxParticipants": 10,
-        "audioEnabled": true
-    }
-}
-
-### Get room details
-GET http://{{host}}/api/rooms/{{roomId}}
-
-### Get room participants
-GET http://{{host}}/api/rooms/{{roomId}}/participants
-
-### Join room
-POST http://{{host}}/api/rooms/join
-Content-Type: application/json
-
-{
-    "roomId": "{{roomId}}",
-    "userId": "user789"
-}
-
-### Leave room
-POST http://{{host}}/api/rooms/leave
-Content-Type: application/json
-
-{
-    "roomId": "{{roomId}}",
-    "userId": "user789"
-}
-
-@host = localhost:9501
-
-### Create room
-# @name createRoom
-POST http://{{host}}/api/rooms
-Content-Type: application/json
-
-{
-  "userId": "user1",
-  "roomName": "Test Room",
-  "config": {
-    "maxParticipants": 10
-  }
-}
-
-### Join room with SIP headers
-@roomId = {{createRoom.response.body.roomId}}
-POST http://{{host}}/api/rooms/sip
-Content-Type: application/json
-X-Conference-Room: 12345
-X-Conference-Server: sip.example.com
-
-{
-  "roomId": "{{roomId}}",
-  "userId": "sip:user2@sip.example.com"
-}
-
-### Get room participants
-GET http://{{host}}/api/rooms/{{roomId}}/participants
-
-### Leave room
-POST http://{{host}}/api/rooms/leave
-Content-Type: application/json
-
-{
-  "roomId": "{{roomId}}",
-  "userId": "sip:user2@sip.example.com"
-}
-
-### Create audio room
-# @name createAudioRoom
-POST http://{{host}}/api/rooms
-Content-Type: application/json
-
-{
-    "userId": "user123",
-    "roomName": "audio_test_room",
     "config": {
         "maxParticipants": 10,
         "audioEnabled": true,
@@ -125,41 +22,109 @@ Content-Type: application/json
     }
 }
 
-### Get audio room status
-@audioRoomId = {{createAudioRoom.response.body.roomId}}
-GET http://{{host}}/api/rooms/{{audioRoomId}}/status
-Content-Type: application/json
+### Get room details
+@roomId = {{createRoom.response.body.roomId}}
+GET http://{{host}}/api/rooms/{{roomId}}
 
-### Join audio room
+### Get room participants
+GET http://{{host}}/api/rooms/{{roomId}}/participants
+
+### Join room
 POST http://{{host}}/api/rooms/join
 Content-Type: application/json
 
 {
-    "roomId": "{{audioRoomId}}",
-    "userId": "participant123",
+    "roomId": "{{roomId}}",
+    "userId": "user789",
     "display": "Test User"
 }
 
-### Get audio room participants
-GET http://{{host}}/api/rooms/{{audioRoomId}}/participants
-
-### Configure participant audio
-POST http://{{host}}/api/rooms/{{audioRoomId}}/configure
-Content-Type: application/json
-
-{
-    "userId": "participant123",
-    "audio": {
-        "muted": false,
-        "quality": 1.0
-    }
-}
-
-### Leave audio room
+### Leave room
 POST http://{{host}}/api/rooms/leave
 Content-Type: application/json
 
 {
-    "roomId": "{{audioRoomId}}",
-    "userId": "participant123"
+    "roomId": "{{roomId}}",
+    "userId": "user789"
+}
+
+### 2. 配置验证测试 ###
+
+### Create room with invalid configuration
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user123",
+    "roomName": "test_room",
+    "config": {
+        "maxParticipants": -1,
+        "audioEnabled": "invalid",
+        "audioConfig": {
+            "sampleRate": 12345,
+            "channels": 3
+        }
+    }
+}
+
+### Create room with invalid maxParticipants
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user123",
+    "roomName": "test_room",
+    "config": {
+        "maxParticipants": 1000,
+        "audioEnabled": true
+    }
+}
+
+### Create room with duplicate name
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user456",
+    "roomName": "test_room",
+    "config": {
+        "maxParticipants": 10,
+        "audioEnabled": true
+    }
+}
+
+### 3. SIP 集成测试 ###
+
+### Join room with SIP headers
+POST http://{{host}}/api/rooms/sip
+Content-Type: application/json
+X-Conference-Room: 12345
+X-Conference-Server: sip.example.com
+
+{
+    "roomId": "{{roomId}}",
+    "userId": "sip:user2@sip.example.com"
+}
+
+### Leave room (SIP user)
+POST http://{{host}}/api/rooms/leave
+Content-Type: application/json
+
+{
+    "roomId": "{{roomId}}",
+    "userId": "sip:user2@sip.example.com"
+}
+
+### 4. 音频配置测试 ###
+
+### Configure participant audio
+POST http://{{host}}/api/rooms/{{roomId}}/configure
+Content-Type: application/json
+
+{
+    "userId": "user789",
+    "audio": {
+        "muted": false,
+        "quality": 1.0
+    }
 }
