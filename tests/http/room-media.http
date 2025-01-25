@@ -23,7 +23,7 @@ Content-Type: application/json
 }
 
 ### Get room details
-@roomId = {{createRoom.response.body.id}}
+@roomId = {{createRoom.response.body.data.roomId}}
 GET http://{{host}}/api/rooms/{{roomId}}
 
 ### Get room participants

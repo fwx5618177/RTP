@@ -12,7 +12,6 @@ use App\Repository\RoomRepository;
 use App\Utils\Container;
 use App\Validator\Validator;
 use App\Media\MediaManager;
-use Ramsey\Uuid\Uuid;
 
 class RoomService extends BaseService
 {
@@ -55,13 +54,12 @@ class RoomService extends BaseService
                 $roomDTO->getUserId()
             );
 
-            // 保存到数据库
+            // 使用 Janus roomId 作为主键
             $roomEntity = new RoomEntity(
-                $this->generateRoomId(),
+                (string)$mediaInfo['roomId'],  // 转换为字符串
                 $roomDTO->getRoomName(),
                 array_merge($roomDTO->getConfig(), [
                     'janus' => [
-                        'roomId' => $mediaInfo['roomId'],
                         'sessionId' => $mediaInfo['sessionId'],
                         'handleId' => $mediaInfo['handleId'],
                         'creator' => $roomDTO->getUserId()
@@ -69,24 +67,29 @@ class RoomService extends BaseService
                 ])
             );
 
-            $this->roomRepository->save($roomEntity);
+            $this->logger->info('Saving room to database', [
+                'roomId' => $roomEntity->getRoomId(),
+                'roomName' => $roomEntity->getRoomName()
+            ]);
+
+            // 保存到数据库
+            $savedRoom = $this->roomRepository->save($roomEntity);
 
             // 保存到 Redis
-            $this->redisService->hSet("room:{$roomEntity->getRoomId()}:metadata", [
-                'name' => $roomEntity->getRoomName(),
+            $roomKey = "room:{$mediaInfo['roomId']}:metadata";
+            $this->logger->info('Saving room metadata to Redis', [
+                'roomKey' => $roomKey
+            ]);
+
+            // 保存到 Redis
+            $this->redisService->hSet($roomKey, [
+                'name' => $savedRoom->getRoomName(),
                 'creator' => $roomDTO->getUserId(),
-                'janus_room_id' => $mediaInfo['roomId'],
-                'created_at' => time(),
+                'created_at' => $savedRoom->getCreatedAt()->format('Y-m-d H:i:s'),
                 'status' => 'active'
             ]);
 
-            // 添加创建者到参与者列表
-            $this->redisService->sAdd(
-                "room:{$roomEntity->getRoomId()}:participants",
-                [$roomDTO->getUserId()]
-            );
-
-            return $roomEntity;
+            return $savedRoom;
         } catch (\Exception $e) {
             $this->logger->error('Error in createRoom', [
                 'error' => $e->getMessage(),
@@ -189,23 +192,30 @@ class RoomService extends BaseService
         }
     }
 
-    private function generateRoomId(): string
-    {
-        return Uuid::uuid4()->toString();
-    }
-
     public function findRoom(string $roomId): ?RoomEntity
     {
         try {
             // 先从 Redis 获取
             $metadata = $this->redisService->hGetAll("room:$roomId:metadata");
+            $this->logger->info('Room id found', [
+                'roomId' => $roomId,
+                'metadata' => $metadata,
+            ]);
             if (empty($metadata)) {
-                // 如果 Redis 没有，从数据库查询
-                return $this->roomRepository->find($roomId);
+                $this->logger->warning('Room not found in Redis', ['roomId' => $roomId]);
+                return null;
             }
 
             // 从数据库获取完整信息
-            return $this->roomRepository->find($roomId);
+            $room = $this->roomRepository->find($roomId);
+            if (!$room) {
+                $this->logger->warning('Room not found in database', ['roomId' => $roomId]);
+                // 如果数据库中没有，但Redis中有，我们应该清理Redis数据
+                $this->redisService->del(["room:$roomId:metadata", "room:$roomId:participants"]);
+                return null;
+            }
+
+            return $room;
         } catch (\Exception $e) {
             $this->logger->error('Error in findRoom', [
                 'error' => $e->getMessage(),

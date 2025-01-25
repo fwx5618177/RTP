@@ -60,14 +60,13 @@ class RoomController extends BaseController
 
             // 构建扁平化的返回数据结构
             $responseData = [
-                'id' => $room->getRoomId(),
+                'roomId' => $room->getRoomId(),
                 'name' => $room->getRoomName(),
                 'createdAt' => $room->getCreatedAt()->format('c'),
                 'creator' => $data['userId'],
                 'maxParticipants' => $data['config']['maxParticipants'] ?? 10,
                 'audioEnabled' => $data['config']['audioEnabled'] ?? true,
                 'videoEnabled' => $data['config']['videoEnabled'] ?? false,
-                'janusRoomId' => $room->getConfig()['janus']['roomId'],
                 'janusSessionId' => $room->getConfig()['janus']['sessionId'],
                 'janusHandleId' => $room->getConfig()['janus']['handleId']
             ];
@@ -206,6 +205,7 @@ class RoomController extends BaseController
             // 获取房间信息
             $room = $this->roomService->findRoom($roomId);
             if (!$room) {
+                $this->logger->warning('Room not found, room id not found', ['roomId' => $roomId]);
                 return $this->errorResponse('Room not found, room id not found', 404);
             }
 
@@ -298,22 +298,25 @@ class RoomController extends BaseController
     public function getRoomDetails(Request $request, string $roomId): Response
     {
         try {
+            $this->logger->info('find roomId:' . $roomId);
             $room = $this->roomService->findRoom($roomId);
 
             if (!$room) {
+                $this->logger->warning('Room detail not found, room id not found', ['roomId' => $roomId]);
                 return $this->errorResponse('Room detail not found, room id not found', 404);
             }
 
             // 构建扁平化的返回数据
             $responseData = [
-                'id' => $room->getRoomId(),
+                'roomId' => $room->getRoomId(),
                 'name' => $room->getRoomName(),
                 'createdAt' => $room->getCreatedAt()->format('c'),
                 'creator' => $room->getConfig()['janus']['creator'],
                 'maxParticipants' => $room->getConfig()['maxParticipants'] ?? 10,
                 'audioEnabled' => $room->getConfig()['audioEnabled'] ?? true,
                 'videoEnabled' => $room->getConfig()['videoEnabled'] ?? false,
-                'janusRoomId' => $room->getConfig()['janus']['roomId'],
+                'janusSessionId' => $room->getConfig()['janus']['sessionId'],
+                'janusHandleId' => $room->getConfig()['janus']['handleId'],
                 'participantsCount' => $this->roomService->getParticipantsCount($roomId)
             ];
 
@@ -325,9 +328,7 @@ class RoomController extends BaseController
                 $responseData['codec'] = $audioConfig['codec'] ?? 'opus';
             }
 
-            return (new Response())
-                ->setStatusCode(200)
-                ->setBody($responseData);
+            return $this->successResponse($responseData, 200);
         } catch (\Exception $e) {
             $this->logger->error('Failed to get room details', [
                 'error' => $e->getMessage(),
@@ -347,35 +348,32 @@ class RoomController extends BaseController
             $room = $this->roomService->findRoom($roomId);
 
             if (!$room) {
+                $this->logger->warning('Room participants not found, room id not found', ['roomId' => $roomId]);
                 return $this->errorResponse('Room participants not found, room id not found', 404);
             }
 
             $participants = $this->roomService->getRoomParticipants($roomId);
 
-            return (new Response())
-                ->setStatusCode(200)
-                ->setBody([
-                    'roomId' => $roomId,
-                    'count' => count($participants),
-                    'participants' => array_map(function ($participant) {
-                        return [
-                            'userId' => $participant['userId'],
-                            'display' => $participant['display'],
-                            'joinedAt' => $participant['joinedAt'],
-                            'audioMuted' => $participant['audioMuted'] ?? false,
-                            'isActive' => $participant['isActive'] ?? true
-                        ];
-                    }, $participants)
-                ]);
+            return $this->successResponse([
+                'roomId' => $roomId,
+                'count' => count($participants),
+                'participants' => array_map(function ($participant) {
+                    return [
+                        'userId' => $participant['userId'],
+                        'display' => $participant['display'],
+                        'joinedAt' => $participant['joinedAt'],
+                        'audioMuted' => $participant['audioMuted'] ?? false,
+                        'isActive' => $participant['isActive'] ?? true
+                    ];
+                }, $participants)
+            ], 200);
         } catch (\Exception $e) {
             $this->logger->error('Failed to get room participants', [
                 'error' => $e->getMessage(),
                 'roomId' => $roomId
             ]);
 
-            return (new Response())
-                ->setStatusCode(500)
-                ->setBody(['error' => 'Failed to get room participants']);
+            return $this->errorResponse('Failed to get room participants', 500);
         }
     }
 }
