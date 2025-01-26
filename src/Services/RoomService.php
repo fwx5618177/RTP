@@ -54,17 +54,14 @@ class RoomService extends BaseService
                 $roomDTO->getUserId()
             );
 
-            // 使用 Janus roomId 作为主键
+            // 创建房间实体
             $roomEntity = new RoomEntity(
-                (string)$mediaInfo['roomId'],  // 转换为字符串
+                (string)$mediaInfo['roomId'],
                 $roomDTO->getRoomName(),
-                array_merge($roomDTO->getConfig(), [
-                    'janus' => [
-                        'sessionId' => $mediaInfo['sessionId'],
-                        'handleId' => $mediaInfo['handleId'],
-                        'creator' => $roomDTO->getUserId()
-                    ]
-                ])
+                $roomDTO->getUserId(),
+                $mediaInfo['sessionId'],
+                $mediaInfo['handleId'],
+                $roomDTO->getConfig()['maxParticipants'] ?? 10
             );
 
             $this->logger->info('Saving room to database', [
@@ -75,7 +72,7 @@ class RoomService extends BaseService
             // 保存到数据库
             $savedRoom = $this->roomRepository->save($roomEntity);
 
-            // 保存到 Redis
+            // 保存扩展配置到 Redis
             $roomKey = "room:{$mediaInfo['roomId']}:metadata";
             $this->logger->info('Saving room metadata to Redis', [
                 'roomKey' => $roomKey
@@ -86,7 +83,12 @@ class RoomService extends BaseService
                 'name' => $savedRoom->getRoomName(),
                 'creator' => $roomDTO->getUserId(),
                 'created_at' => $savedRoom->getCreatedAt()->format('Y-m-d H:i:s'),
-                'status' => 'active'
+                'status' => 'active',
+                'audio_enabled' => $roomDTO->getConfig()['audioEnabled'] ?? true,
+                'video_enabled' => $roomDTO->getConfig()['videoEnabled'] ?? false,
+                'sample_rate' => $roomDTO->getConfig()['audioConfig']['sampleRate'] ?? 16000,
+                'channels' => $roomDTO->getConfig()['audioConfig']['channels'] ?? 1,
+                'codec' => $roomDTO->getConfig()['audioConfig']['codec'] ?? 'opus'
             ]);
 
             return $savedRoom;

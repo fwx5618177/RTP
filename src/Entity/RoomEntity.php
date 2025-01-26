@@ -28,7 +28,19 @@ class RoomEntity extends BaseEntity
     #[ORM\Column(name: 'room_name', type: 'string', length: 255)]
     private string $roomName;
 
-    #[ORM\Column(type: 'json')]
+    #[ORM\Column(name: 'creator_id', type: 'string', length: 36)]
+    private string $creatorId;
+
+    #[ORM\Column(name: 'max_participants', type: 'integer')]
+    private int $maxParticipants;
+
+    #[ORM\Column(name: 'janus_session_id', type: 'string', length: 36)]
+    private string $janusSessionId;
+
+    #[ORM\Column(name: 'janus_handle_id', type: 'string', length: 36)]
+    private string $janusHandleId;
+
+    #[ORM\Column(name: 'config', type: 'json', nullable: true)]
     private array $config = [];
 
     #[ORM\Column(name: 'created_at', type: 'datetime')]
@@ -43,17 +55,21 @@ class RoomEntity extends BaseEntity
     public function __construct(
         string $roomId,
         string $roomName,
-        array $config = []
+        string $creatorId,
+        string $janusSessionId,
+        string $janusHandleId,
+        int $maxParticipants = 10
     ) {
         parent::__construct();
         $this->uuid = Uuid::uuid4()->toString();
         $this->roomId = $roomId;
         $this->roomName = $roomName;
-        $this->config = $config;
+        $this->creatorId = $creatorId;
+        $this->janusSessionId = $janusSessionId;
+        $this->janusHandleId = $janusHandleId;
+        $this->maxParticipants = $maxParticipants;
         $this->createdAt = new DateTime();
         $this->updatedAt = new DateTime();
-
-        $this->logOperation('created');
     }
 
     // 生命周期回调
@@ -120,6 +136,54 @@ class RoomEntity extends BaseEntity
     public function setRoomName(string $roomName): self
     {
         $this->roomName = $roomName;
+
+        return $this;
+    }
+
+    public function getCreatorId(): string
+    {
+        return $this->creatorId;
+    }
+
+    public function setCreatorId(string $creatorId): self
+    {
+        $this->creatorId = $creatorId;
+
+        return $this;
+    }
+
+    public function getMaxParticipants(): int
+    {
+        return $this->maxParticipants;
+    }
+
+    public function setMaxParticipants(int $maxParticipants): self
+    {
+        $this->maxParticipants = $maxParticipants;
+
+        return $this;
+    }
+
+    public function getJanusSessionId(): string
+    {
+        return $this->janusSessionId;
+    }
+
+    public function setJanusSessionId(string $janusSessionId): self
+    {
+        $this->janusSessionId = $janusSessionId;
+
+        return $this;
+    }
+
+    public function getJanusHandleId(): string
+    {
+        return $this->janusHandleId;
+    }
+
+    public function setJanusHandleId(string $janusHandleId): self
+    {
+        $this->janusHandleId = $janusHandleId;
 
         return $this;
     }

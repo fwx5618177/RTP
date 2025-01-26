@@ -67,8 +67,8 @@ class RoomController extends BaseController
                 'maxParticipants' => $data['config']['maxParticipants'] ?? 10,
                 'audioEnabled' => $data['config']['audioEnabled'] ?? true,
                 'videoEnabled' => $data['config']['videoEnabled'] ?? false,
-                'janusSessionId' => $room->getConfig()['janus']['sessionId'],
-                'janusHandleId' => $room->getConfig()['janus']['handleId']
+                'janusSessionId' => $room->getJanusSessionId(),
+                'janusHandleId' => $room->getJanusHandleId()
             ];
 
             // 如果存在音频配置，添加到响应中

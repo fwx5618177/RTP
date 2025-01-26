@@ -10,16 +10,21 @@ use App\Services\RedisService;
 use App\Utils\Container;
 use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\ORM\EntityManager;
+use App\Exceptions\DatabaseException;
+use App\Logs\Logger;
 
 class RoomRepository extends BaseRepository
 {
     private RedisService $redisService;
+    private Logger $logger;
 
     public function __construct(EntityManager $em)
     {
         parent::__construct($em, $em->getClassMetadata(RoomEntity::class));
-        // 从容器中获取 RedisService
-        $this->redisService = Container::getInstance()->get(RedisService::class);
+        // 从容器中获取服务
+        $container = Container::getInstance();
+        $this->redisService = $container->get(RedisService::class);
+        $this->logger = Logger::getInstance('room-repository');
     }
 
     public function createRoom(RoomEntity $room): RoomEntity
@@ -44,7 +49,6 @@ class RoomRepository extends BaseRepository
                     'id' => $room->getId(),
                     'roomId' => $room->getRoomId(),
                     'roomName' => $room->getRoomName(),
-                    'config' => $room->getConfig(),
                     'participants' => [],
                     'createdAt' => $room->getCreatedAt()->format('Y-m-d H:i:s'),
                 ])
@@ -104,7 +108,7 @@ class RoomRepository extends BaseRepository
             $roomData = json_decode($roomData, true);
             $roomData['participants'] = array_filter(
                 $roomData['participants'],
-                fn ($participant) => $participant !== $userId
+                fn($participant) => $participant !== $userId
             );
             $this->redisService->set("room:{$roomId}", json_encode($roomData));
         }
@@ -133,12 +137,21 @@ class RoomRepository extends BaseRepository
 
     public function save(RoomEntity $room): RoomEntity
     {
-        return $this->executeInTransaction(function ($em) use ($room) {
-            $em->persist($room);
-            $em->flush();
-
-            return $room;
-        });
+        try {
+            return $this->executeInTransaction(function ($em) use ($room) {
+                if (!$em->contains($room)) {
+                    $em->persist($room);
+                }
+                $em->flush();
+                return $room;
+            });
+        } catch (DatabaseException $e) {
+            $this->logger->error('Failed to save room', [
+                'error' => $e->getMessage(),
+                'roomId' => $room->getRoomId()
+            ]);
+            throw $e;
+        }
     }
 
     public function delete(RoomEntity $room): void

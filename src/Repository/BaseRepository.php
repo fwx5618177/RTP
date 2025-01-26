@@ -3,19 +3,22 @@
 namespace App\Repository;
 
 use App\Exceptions\DatabaseException;
+use App\Logs\Logger;
 use App\Utils\DBConnectionPool;
 use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\ORM\EntityRepository;
+use App\Providers\DatabaseServiceProvider;
 
 abstract class BaseRepository extends EntityRepository
 {
     protected DBConnectionPool $connectionPool;
     private int $maxRetries = 3;
-
+    private Logger $logger;
     public function __construct($em, $class)
     {
         parent::__construct($em, $class);
         $this->connectionPool = DBConnectionPool::getInstance();
+        $this->logger = Logger::getInstance('base-repository');
     }
 
     protected function executeInTransaction(callable $callback)
@@ -25,17 +28,26 @@ abstract class BaseRepository extends EntityRepository
 
         while ($attempts < $this->maxRetries) {
             $connection = null;
+            $em = null;
 
             try {
+                // 获取连接
                 $connection = $this->connectionPool->getConnection();
 
-                if (! $connection->isTransactionActive()) {
+                // 获取新的 EntityManager，并确保使用正确的连接
+                $em = DatabaseServiceProvider::createEntityManager($connection);
+
+                // 开始事务
+                if (!$connection->isTransactionActive()) {
                     $connection->beginTransaction();
                 }
 
-                $result = $callback($this->getEntityManager());
+                // 执行回调
+                $result = $callback($em);
 
+                // 提交事务
                 if ($connection->isTransactionActive()) {
+                    $em->flush();
                     $connection->commit();
                 }
 
@@ -44,11 +56,13 @@ abstract class BaseRepository extends EntityRepository
                 $attempts++;
                 $lastException = $e;
 
+                // 回滚事务
                 if ($connection && $connection->isTransactionActive()) {
                     try {
                         $connection->rollBack();
                     } catch (\Exception $rollbackException) {
                         // 记录回滚失败，但继续处理原始异常
+                        $this->logger->error('Failed to roll back transaction: ' . $rollbackException->getMessage());
                     }
                 }
 
@@ -63,6 +77,13 @@ abstract class BaseRepository extends EntityRepository
                 // 递增延迟重试
                 usleep(100000 * $attempts);
             } finally {
+                // 清理资源
+                if ($em) {
+                    $em->clear();
+                    $em->close();
+                }
+
+                // 归还连接
                 if ($connection) {
                     $this->connectionPool->releaseConnection($connection);
                 }
@@ -77,10 +98,27 @@ abstract class BaseRepository extends EntityRepository
 
     protected function executeSafely(callable $callback)
     {
+        $connection = null;
+        $em = null;
+
         try {
-            return $callback($this->getEntityManager());
+            // 获取连接
+            $connection = $this->connectionPool->getConnection();
+
+            // 创建新的 EntityManager
+            $em = DatabaseServiceProvider::createEntityManager($connection);
+
+            return $callback($em);
         } catch (DBALException $e) {
             throw new DatabaseException($e->getMessage(), $e->getCode(), $e);
+        } finally {
+            if ($em) {
+                $em->clear();
+                $em->close();
+            }
+            if ($connection) {
+                $this->connectionPool->releaseConnection($connection);
+            }
         }
     }
 }
