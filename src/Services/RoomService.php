@@ -209,7 +209,7 @@ class RoomService extends BaseService
             }
 
             // 从数据库获取完整信息
-            $room = $this->roomRepository->find($roomId);
+            $room = $this->roomRepository->findByRoomId($roomId);
             if (!$room) {
                 $this->logger->warning('Room not found in database', ['roomId' => $roomId]);
                 // 如果数据库中没有，但Redis中有，我们应该清理Redis数据

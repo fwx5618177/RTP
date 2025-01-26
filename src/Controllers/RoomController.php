@@ -311,12 +311,10 @@ class RoomController extends BaseController
                 'roomId' => $room->getRoomId(),
                 'name' => $room->getRoomName(),
                 'createdAt' => $room->getCreatedAt()->format('c'),
-                'creator' => $room->getConfig()['janus']['creator'],
-                'maxParticipants' => $room->getConfig()['maxParticipants'] ?? 10,
-                'audioEnabled' => $room->getConfig()['audioEnabled'] ?? true,
-                'videoEnabled' => $room->getConfig()['videoEnabled'] ?? false,
-                'janusSessionId' => $room->getConfig()['janus']['sessionId'],
-                'janusHandleId' => $room->getConfig()['janus']['handleId'],
+                'creator' => $room->getCreatorId(),
+                'maxParticipants' => $room->getMaxParticipants() ?? 10,
+                'janusSessionId' => $room->getJanusSessionId(),
+                'janusHandleId' => $room->getJanusHandleId(),
                 'participantsCount' => $this->roomService->getParticipantsCount($roomId)
             ];
 
