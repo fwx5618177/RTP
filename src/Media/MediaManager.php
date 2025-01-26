@@ -61,12 +61,14 @@ class MediaManager
             // 创建 SDP Offer
             $sdpOffer = $this->createSdpOffer();
             $this->logger->debug('Created SDP offer', ['sdp' => $sdpOffer]);
-
             // 通过 Janus Gateway 发送 SIP INVITE
-            $sessionInfo = $this->janusGateway->createRoomSession($roomName, $userId, $sdpOffer);
-            $this->logger->debug('Received session info', ['info' => $sessionInfo]);
+            $sessionInfo = $this->janusGateway->createRoom($roomName, $userId, [$sdpOffer]);
+            $this->logger->debug('Received session info', ['info' => json_encode($sessionInfo)]);
 
             // 解析 SDP Answer
+            if (!isset($sessionInfo['sdpAnswer'])) {
+                throw new MediaException('Missing SDP answer in session info');
+            }
             $mediaInfo = $this->parseSdpAnswer($sessionInfo['sdpAnswer']);
 
             return [
