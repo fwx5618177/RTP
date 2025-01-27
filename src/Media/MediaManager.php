@@ -12,7 +12,7 @@ use RTCKit\SDP\{Parser};
 
 /**
  * MediaManager 类
- * 
+ *
  * 负责处理所有媒体相关的操作，包括：
  * - SDP 协商（Offer/Answer）
  * - RTP 音频流配置
@@ -32,7 +32,7 @@ class MediaManager
     private const DEFAULT_AUDIO_CODECS = [
         ['payload' => 0, 'name' => 'PCMU', 'rate' => 8000, 'channels' => 1],  // G.711 u-law
         ['payload' => 8, 'name' => 'PCMA', 'rate' => 8000, 'channels' => 1],  // G.711 a-law
-        ['payload' => 101, 'name' => 'telephone-event', 'rate' => 8000, 'channels' => 1, 'fmtp' => '0-15']  // DTMF
+        ['payload' => 101, 'name' => 'telephone-event', 'rate' => 8000, 'channels' => 1, 'fmtp' => '0-15'],  // DTMF
     ];
 
     public function __construct()
@@ -44,7 +44,7 @@ class MediaManager
 
     /**
      * 创建媒体会话
-     * 
+     *
      * @param string $roomName 房间名称
      * @param string $userId 用户ID
      * @return array 会话信息，包含 RTP 端口和编解码器信息
@@ -55,7 +55,7 @@ class MediaManager
         try {
             $this->logger->info('Creating media session', [
                 'roomName' => $roomName,
-                'userId' => $userId
+                'userId' => $userId,
             ]);
 
             // 创建 SDP Offer
@@ -66,7 +66,7 @@ class MediaManager
             $this->logger->debug('Received session info', ['info' => json_encode($sessionInfo)]);
 
             // 解析 SDP Answer
-            if (!isset($sessionInfo['sdpAnswer'])) {
+            if (! isset($sessionInfo['sdpAnswer'])) {
                 throw new MediaException('Missing SDP answer in session info');
             }
             $mediaInfo = $this->parseSdpAnswer($sessionInfo['sdpAnswer']);
@@ -75,13 +75,14 @@ class MediaManager
                 'roomId' => $sessionInfo['roomId'],
                 'mediaInfo' => $mediaInfo,
                 'ip' => $sessionInfo['ip'],
-                'timestamp' => time()
+                'timestamp' => time(),
             ];
         } catch (\Exception $e) {
             $this->logger->error('Failed to create media session', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             throw new MediaException('Failed to create media session: ' . $e->getMessage());
         }
     }
@@ -89,7 +90,7 @@ class MediaManager
     /**
      * 创建 SDP Offer
      * 生成用于音频桥接的 SDP 描述
-     * 
+     *
      * @return string SDP 字符串
      * @throws MediaException
      */
@@ -148,8 +149,9 @@ class MediaManager
             return $sdpString;
         } catch (\Exception $e) {
             $this->logger->error('Failed to create SDP offer', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             throw new MediaException('Failed to create SDP offer: ' . $e->getMessage());
         }
     }
@@ -157,7 +159,7 @@ class MediaManager
     /**
      * 解析 SDP Answer
      * 解析 Janus Gateway 返回的 SDP 应答
-     * 
+     *
      * @param string $sdpAnswer SDP Answer 字符串
      * @return array 解析后的媒体信息
      * @throws MediaException
@@ -180,13 +182,13 @@ class MediaManager
                     $mediaInfo[$currentMedia] = [
                         'port' => (int)$parts[1],
                         'protocol' => $parts[2],
-                        'formats' => array_slice($parts, 3)
+                        'formats' => array_slice($parts, 3),
                     ];
                 } elseif (strpos($line, 'c=') === 0) {
                     // 连接信息行
                     $parts = explode(' ', $line);
                     $mediaInfo['connection'] = [
-                        'ip' => end($parts)
+                        'ip' => end($parts),
                     ];
                 }
             }
@@ -195,8 +197,9 @@ class MediaManager
         } catch (\Exception $e) {
             $this->logger->error('Failed to parse SDP answer', [
                 'error' => $e->getMessage(),
-                'sdpAnswer' => $sdpAnswer
+                'sdpAnswer' => $sdpAnswer,
             ]);
+
             throw new MediaException('Failed to parse SDP answer: ' . $e->getMessage());
         }
     }
@@ -220,7 +223,7 @@ class MediaManager
                 "secret" => "room_" . $roomId,
                 "sampling_rate" => 16000,
                 "record" => false,
-                "notify_joining" => true
+                "notify_joining" => true,
             ];
 
             $response = $this->janusGateway->createRoom(
@@ -234,13 +237,14 @@ class MediaManager
                 'sessionId' => $this->sessionId,
                 'handleId' => $this->handleId,
                 'config' => $roomConfig,
-                'janusResponse' => $response
+                'janusResponse' => $response,
             ];
         } catch (\Exception $e) {
             $this->logger->error('Failed to create audio room', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             throw new MediaException('Failed to create audio room: ' . $e->getMessage());
         }
     }
@@ -248,12 +252,12 @@ class MediaManager
     public function joinAudioRoom(int $roomId, string $userId, string $display): array
     {
         try {
-            if (!$this->sessionId) {
+            if (! $this->sessionId) {
                 $session = $this->janusGateway->createSession();
                 $this->sessionId = (string)$session['data']['id'];
             }
 
-            if (!$this->handleId) {
+            if (! $this->handleId) {
                 $handle = $this->janusGateway->attachPlugin($this->sessionId);
                 $this->handleId = (string)$handle['data']['id'];
             }
@@ -269,13 +273,14 @@ class MediaManager
                 'roomId' => $roomId,
                 'sessionId' => $this->sessionId,
                 'handleId' => $this->handleId,
-                'janusResponse' => $response
+                'janusResponse' => $response,
             ];
         } catch (\Exception $e) {
             $this->logger->error('Failed to join audio room', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             throw new MediaException('Failed to join audio room: ' . $e->getMessage());
         }
     }

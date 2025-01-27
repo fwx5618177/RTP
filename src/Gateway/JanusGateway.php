@@ -28,7 +28,7 @@ class JanusGateway
         $createSession = [
             "janus" => "create",
             "transaction" => $this->generateTransactionId(),
-            "apisecret" => $this->apiSecret
+            "apisecret" => $this->apiSecret,
         ];
 
         return $this->sendRequest($this->apiEndpoint, $createSession);
@@ -40,7 +40,7 @@ class JanusGateway
             "janus" => "attach",
             "plugin" => $plugin,
             "transaction" => $this->generateTransactionId(),
-            "apisecret" => $this->apiSecret
+            "apisecret" => $this->apiSecret,
         ];
 
         return $this->sendRequest("$this->apiEndpoint/$sessionId", $attachPlugin);
@@ -55,10 +55,10 @@ class JanusGateway
                 "sampling_rate" => 16000,
                 "spatial_audio" => false,
                 "record" => false,
-                "permanent" => false
+                "permanent" => false,
             ], $roomConfig),
             "transaction" => $this->generateTransactionId(),
-            "apisecret" => $this->apiSecret
+            "apisecret" => $this->apiSecret,
         ];
 
         return $this->sendRequest("$this->apiEndpoint/$sessionId/$handleId", $createRoom);
@@ -72,10 +72,10 @@ class JanusGateway
                 "request" => "join",
                 "room" => $roomId,
                 "display" => $display,
-                "muted" => false
+                "muted" => false,
             ],
             "transaction" => $this->generateTransactionId(),
-            "apisecret" => $this->apiSecret
+            "apisecret" => $this->apiSecret,
         ];
 
         return $this->sendRequest("$this->apiEndpoint/$sessionId/$handleId", $joinRoom);
@@ -95,7 +95,7 @@ class JanusGateway
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode($data),
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_TIMEOUT => 10
+            CURLOPT_TIMEOUT => 10,
         ]);
 
         $response = curl_exec($ch);

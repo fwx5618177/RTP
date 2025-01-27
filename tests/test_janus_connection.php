@@ -17,11 +17,11 @@ try {
     $createSession = [
         "janus" => "create",
         "transaction" => generateTransactionId(),
-        "apisecret" => $janus_api_secret
+        "apisecret" => $janus_api_secret,
     ];
 
     $response = sendRequest($janus_http_endpoint, $createSession);
-    if (!isset($response['data']['id'])) {
+    if (! isset($response['data']['id'])) {
         throw new Exception("Failed to create Janus session: " . json_encode($response));
     }
 
@@ -33,11 +33,11 @@ try {
         "janus" => "attach",
         "plugin" => "janus.plugin.audiobridge",
         "transaction" => generateTransactionId(),
-        "apisecret" => $janus_api_secret
+        "apisecret" => $janus_api_secret,
     ];
 
     $response = sendRequest("$janus_http_endpoint/$sessionId", $attachPlugin);
-    if (!isset($response['data']['id'])) {
+    if (! isset($response['data']['id'])) {
         throw new Exception("Failed to attach to AudioBridge plugin: " . json_encode($response));
     }
 
@@ -57,10 +57,10 @@ try {
             "sampling_rate" => 16000,
             "spatial_audio" => false,
             "record" => false,
-            "permanent" => false
+            "permanent" => false,
         ],
         "transaction" => generateTransactionId(),
-        "apisecret" => $janus_api_secret
+        "apisecret" => $janus_api_secret,
     ];
 
     $response = sendRequest("$janus_http_endpoint/$sessionId/$handleId", $createRoom);
@@ -74,10 +74,10 @@ try {
             "request" => "join",
             "room" => $roomId,
             "display" => "Participant 1",
-            "muted" => false
+            "muted" => false,
         ],
         "transaction" => generateTransactionId(),
-        "apisecret" => $janus_api_secret
+        "apisecret" => $janus_api_secret,
     ];
 
     $response = sendRequest("$janus_http_endpoint/$sessionId/$handleId", $participant1);
@@ -97,10 +97,10 @@ try {
             "request" => "join",
             "room" => $roomId,
             "display" => "Participant 2",
-            "muted" => false
+            "muted" => false,
         ],
         "transaction" => generateTransactionId(),
-        "apisecret" => $janus_api_secret
+        "apisecret" => $janus_api_secret,
     ];
 
     $response = sendRequest("$janus_http_endpoint/$sessionId/$handleId2", $participant2);
@@ -113,10 +113,10 @@ try {
         "body" => [
             "request" => "configure",
             "muted" => false,
-            "quality" => 1.0
+            "quality" => 1.0,
         ],
         "transaction" => generateTransactionId(),
-        "apisecret" => $janus_api_secret
+        "apisecret" => $janus_api_secret,
     ];
 
     $response = sendRequest("$janus_http_endpoint/$sessionId/$handleId", $participant1Audio);
@@ -128,10 +128,10 @@ try {
         "janus" => "message",
         "body" => [
             "request" => "listparticipants",
-            "room" => $roomId
+            "room" => $roomId,
         ],
         "transaction" => generateTransactionId(),
-        "apisecret" => $janus_api_secret
+        "apisecret" => $janus_api_secret,
     ];
 
     $response = sendRequest("$janus_http_endpoint/$sessionId/$handleId", $listParticipants);
@@ -149,10 +149,10 @@ try {
         $leaveRoom2 = [
             "janus" => "message",
             "body" => [
-                "request" => "leave"
+                "request" => "leave",
             ],
             "transaction" => generateTransactionId(),
-            "apisecret" => $janus_api_secret
+            "apisecret" => $janus_api_secret,
         ];
         sendRequest("$janus_http_endpoint/$sessionId/$handleId2", $leaveRoom2);
     }
@@ -162,10 +162,10 @@ try {
         $leaveRoom1 = [
             "janus" => "message",
             "body" => [
-                "request" => "leave"
+                "request" => "leave",
             ],
             "transaction" => generateTransactionId(),
-            "apisecret" => $janus_api_secret
+            "apisecret" => $janus_api_secret,
         ];
         sendRequest("$janus_http_endpoint/$sessionId/$handleId", $leaveRoom1);
 
@@ -175,10 +175,10 @@ try {
             "body" => [
                 "request" => "destroy",
                 "room" => $roomId,
-                "secret" => "roomsecret"
+                "secret" => "roomsecret",
             ],
             "transaction" => generateTransactionId(),
-            "apisecret" => $janus_api_secret
+            "apisecret" => $janus_api_secret,
         ];
         sendRequest("$janus_http_endpoint/$sessionId/$handleId", $destroyRoom);
     }
@@ -188,7 +188,7 @@ try {
         $detach2 = [
             "janus" => "detach",
             "transaction" => generateTransactionId(),
-            "apisecret" => $janus_api_secret
+            "apisecret" => $janus_api_secret,
         ];
         sendRequest("$janus_http_endpoint/$sessionId/$handleId2", $detach2);
     }
@@ -197,7 +197,7 @@ try {
         $detach = [
             "janus" => "detach",
             "transaction" => generateTransactionId(),
-            "apisecret" => $janus_api_secret
+            "apisecret" => $janus_api_secret,
         ];
         sendRequest("$janus_http_endpoint/$sessionId/$handleId", $detach);
     }
@@ -206,7 +206,7 @@ try {
         $destroy = [
             "janus" => "destroy",
             "transaction" => generateTransactionId(),
-            "apisecret" => $janus_api_secret
+            "apisecret" => $janus_api_secret,
         ];
         sendRequest("$janus_http_endpoint/$sessionId", $destroy);
     }
@@ -225,7 +225,7 @@ function sendRequest($url, $data = [], $method = 'POST')
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
         CURLOPT_TIMEOUT => 10,
-        CURLOPT_CONNECTTIMEOUT => 5
+        CURLOPT_CONNECTTIMEOUT => 5,
     ];
 
     if ($method === 'POST') {

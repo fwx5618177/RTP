@@ -32,6 +32,7 @@ class RoomController extends BaseController
         // 基本参数验证
         if (empty($data['userId'])) {
             $this->logger->warning('userId is required but was empty');
+
             return (new Response())
                 ->setStatusCode(400)
                 ->setBody(['error' => 'userId is required']);
@@ -39,6 +40,7 @@ class RoomController extends BaseController
 
         if (empty($data['roomName'])) {
             $this->logger->warning('roomName is required but was empty');
+
             return (new Response())
                 ->setStatusCode(400)
                 ->setBody(['error' => 'roomName is required']);
@@ -47,7 +49,7 @@ class RoomController extends BaseController
         // 配置验证
         if (isset($data['config'])) {
             $configErrors = $this->validateRoomConfig($data['config']);
-            if (!empty($configErrors)) {
+            if (! empty($configErrors)) {
                 return (new Response())
                     ->setStatusCode(400)
                     ->setBody(['error' => 'Invalid configuration', 'details' => $configErrors]);
@@ -68,7 +70,7 @@ class RoomController extends BaseController
                 'audioEnabled' => $data['config']['audioEnabled'] ?? true,
                 'videoEnabled' => $data['config']['videoEnabled'] ?? false,
                 'janusSessionId' => $room->getJanusSessionId(),
-                'janusHandleId' => $room->getJanusHandleId()
+                'janusHandleId' => $room->getJanusHandleId(),
             ];
 
             // 如果存在音频配置，添加到响应中
@@ -80,14 +82,14 @@ class RoomController extends BaseController
 
             $this->logger->info('Room created successfully', [
                 'roomId' => $room->getRoomId(),
-                'createdAt' => $room->getCreatedAt()->format('c')
+                'createdAt' => $room->getCreatedAt()->format('c'),
             ]);
 
             return $this->successResponse($responseData, 201);
         } catch (\Exception $e) {
             $this->logger->error('Failed to create room', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return (new Response())
@@ -192,7 +194,7 @@ class RoomController extends BaseController
             // 获取 SIP 头信息
             $sipHeaders = [
                 'X-Conference-Room' => $request->getHeader('X-Conference-Room'),
-                'X-Conference-Server' => $request->getHeader('X-Conference-Server')
+                'X-Conference-Server' => $request->getHeader('X-Conference-Server'),
             ];
 
             // 验证必要的 SIP 头
@@ -204,8 +206,9 @@ class RoomController extends BaseController
 
             // 获取房间信息
             $room = $this->roomService->findRoom($roomId);
-            if (!$room) {
+            if (! $room) {
                 $this->logger->warning('Room not found, room id not found', ['roomId' => $roomId]);
+
                 return $this->errorResponse('Room not found, room id not found', 404);
             }
 
@@ -217,7 +220,7 @@ class RoomController extends BaseController
             $this->logger->info('SIP call routed', [
                 'roomId' => $roomId,
                 'sipUserId' => $sipUserId,
-                'headers' => $sipHeaders
+                'headers' => $sipHeaders,
             ]);
 
             return (new Response())
@@ -226,14 +229,14 @@ class RoomController extends BaseController
                     'message' => 'SIP call routed successfully',
                     'roomId' => $roomId,
                     'sipUserId' => $sipUserId,
-                    'joinResult' => $joinResult
+                    'joinResult' => $joinResult,
                 ]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to handle SIP call', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'roomId' => $roomId,
-                'userId' => $userId
+                'userId' => $userId,
             ]);
 
             return (new Response())
@@ -248,7 +251,7 @@ class RoomController extends BaseController
 
         // 验证最大参与者数
         if (isset($config['maxParticipants'])) {
-            if (!is_int($config['maxParticipants']) || $config['maxParticipants'] <= 0) {
+            if (! is_int($config['maxParticipants']) || $config['maxParticipants'] <= 0) {
                 $errors[] = 'maxParticipants must be a positive integer';
             }
             if ($config['maxParticipants'] > 100) { // 设置上限
@@ -258,31 +261,31 @@ class RoomController extends BaseController
 
         // 验证音频配置
         if (isset($config['audioEnabled'])) {
-            if (!is_bool($config['audioEnabled'])) {
+            if (! is_bool($config['audioEnabled'])) {
                 $errors[] = 'audioEnabled must be a boolean value';
             }
         }
 
         // 验证视频配置
         if (isset($config['videoEnabled'])) {
-            if (!is_bool($config['videoEnabled'])) {
+            if (! is_bool($config['videoEnabled'])) {
                 $errors[] = 'videoEnabled must be a boolean value';
             }
         }
 
         // 验证音频配置详情
         if (isset($config['audioConfig'])) {
-            if (!is_array($config['audioConfig'])) {
+            if (! is_array($config['audioConfig'])) {
                 $errors[] = 'audioConfig must be an object';
             } else {
                 if (isset($config['audioConfig']['sampleRate'])) {
                     $validSampleRates = [8000, 16000, 32000, 44100, 48000];
-                    if (!in_array($config['audioConfig']['sampleRate'], $validSampleRates)) {
+                    if (! in_array($config['audioConfig']['sampleRate'], $validSampleRates)) {
                         $errors[] = 'Invalid sample rate. Must be one of: ' . implode(', ', $validSampleRates);
                     }
                 }
                 if (isset($config['audioConfig']['channels'])) {
-                    if (!in_array($config['audioConfig']['channels'], [1, 2])) {
+                    if (! in_array($config['audioConfig']['channels'], [1, 2])) {
                         $errors[] = 'Channels must be either 1 (mono) or 2 (stereo)';
                     }
                 }
@@ -301,8 +304,9 @@ class RoomController extends BaseController
             $this->logger->info('find roomId:' . $roomId);
             $room = $this->roomService->findRoom($roomId);
 
-            if (!$room) {
+            if (! $room) {
                 $this->logger->warning('Room detail not found, room id not found', ['roomId' => $roomId]);
+
                 return $this->errorResponse('Room detail not found, room id not found', 404);
             }
 
@@ -315,7 +319,7 @@ class RoomController extends BaseController
                 'maxParticipants' => $room->getMaxParticipants() ?? 10,
                 'janusSessionId' => $room->getJanusSessionId(),
                 'janusHandleId' => $room->getJanusHandleId(),
-                'participantsCount' => $this->roomService->getParticipantsCount($roomId)
+                'participantsCount' => $this->roomService->getParticipantsCount($roomId),
             ];
 
             // 如果存在音频配置，添加到响应中
@@ -330,7 +334,7 @@ class RoomController extends BaseController
         } catch (\Exception $e) {
             $this->logger->error('Failed to get room details', [
                 'error' => $e->getMessage(),
-                'roomId' => $roomId
+                'roomId' => $roomId,
             ]);
 
             return $this->errorResponse('Failed to get room details', 500);
@@ -345,8 +349,9 @@ class RoomController extends BaseController
         try {
             $room = $this->roomService->findRoom($roomId);
 
-            if (!$room) {
+            if (! $room) {
                 $this->logger->warning('Room participants not found, room id not found', ['roomId' => $roomId]);
+
                 return $this->errorResponse('Room participants not found, room id not found', 404);
             }
 
@@ -361,14 +366,14 @@ class RoomController extends BaseController
                         'display' => $participant['display'],
                         'joinedAt' => $participant['joinedAt'],
                         'audioMuted' => $participant['audioMuted'] ?? false,
-                        'isActive' => $participant['isActive'] ?? true
+                        'isActive' => $participant['isActive'] ?? true,
                     ];
-                }, $participants)
+                }, $participants),
             ], 200);
         } catch (\Exception $e) {
             $this->logger->error('Failed to get room participants', [
                 'error' => $e->getMessage(),
-                'roomId' => $roomId
+                'roomId' => $roomId,
             ]);
 
             return $this->errorResponse('Failed to get room participants', 500);

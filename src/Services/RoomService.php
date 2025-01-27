@@ -8,10 +8,10 @@ use App\DTO\RoomDTO;
 use App\Entity\RoomEntity;
 use App\Exceptions\RoomException;
 use App\Logs\Logger;
+use App\Media\MediaManager;
 use App\Repository\RoomRepository;
 use App\Utils\Container;
 use App\Validator\Validator;
-use App\Media\MediaManager;
 
 class RoomService extends BaseService
 {
@@ -32,7 +32,7 @@ class RoomService extends BaseService
     {
         try {
             $this->logger->info('Starting room creation', [
-                'roomName' => $roomDTO->getRoomName()
+                'roomName' => $roomDTO->getRoomName(),
             ]);
 
             // 验证输入
@@ -66,7 +66,7 @@ class RoomService extends BaseService
 
             $this->logger->info('Saving room to database', [
                 'roomId' => $roomEntity->getRoomId(),
-                'roomName' => $roomEntity->getRoomName()
+                'roomName' => $roomEntity->getRoomName(),
             ]);
 
             // 保存到数据库
@@ -75,7 +75,7 @@ class RoomService extends BaseService
             // 保存扩展配置到 Redis
             $roomKey = "room:{$mediaInfo['roomId']}:metadata";
             $this->logger->info('Saving room metadata to Redis', [
-                'roomKey' => $roomKey
+                'roomKey' => $roomKey,
             ]);
 
             // 保存到 Redis
@@ -88,15 +88,16 @@ class RoomService extends BaseService
                 'video_enabled' => $roomDTO->getConfig()['videoEnabled'] ?? false,
                 'sample_rate' => $roomDTO->getConfig()['audioConfig']['sampleRate'] ?? 16000,
                 'channels' => $roomDTO->getConfig()['audioConfig']['channels'] ?? 1,
-                'codec' => $roomDTO->getConfig()['audioConfig']['codec'] ?? 'opus'
+                'codec' => $roomDTO->getConfig()['audioConfig']['codec'] ?? 'opus',
             ]);
 
             return $savedRoom;
         } catch (\Exception $e) {
             $this->logger->error('Error in createRoom', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             throw $e;
         }
     }
@@ -119,7 +120,7 @@ class RoomService extends BaseService
                 return [
                     'roomId' => $roomId,
                     'metadata' => $metadata,
-                    'participants' => $this->redisService->sMembers("room:$roomId:participants")
+                    'participants' => $this->redisService->sMembers("room:$roomId:participants"),
                 ];
             }
             // 加入房间
@@ -127,20 +128,21 @@ class RoomService extends BaseService
 
             $this->logger->info('User joined room', [
                 'roomId' => $roomId,
-                'userId' => $userId
+                'userId' => $userId,
             ]);
 
             return [
                 'roomId' => $roomId,
                 'metadata' => $metadata,
-                'participants' => $this->redisService->sMembers("room:$roomId:participants")
+                'participants' => $this->redisService->sMembers("room:$roomId:participants"),
             ];
         } catch (\Exception $e) {
             $this->logger->error('Error in joinRoom', [
                 'error' => $e->getMessage(),
                 'roomId' => $roomId,
-                'userId' => $userId
+                'userId' => $userId,
             ]);
+
             throw $e;
         }
     }
@@ -153,7 +155,7 @@ class RoomService extends BaseService
             }
 
             // 检查房间是否存在
-            if (!$this->redisService->exists("room:$roomId:metadata")) {
+            if (! $this->redisService->exists("room:$roomId:metadata")) {
                 throw new RoomException('Room not found');
             }
 
@@ -162,7 +164,7 @@ class RoomService extends BaseService
 
             $this->logger->info('User left room', [
                 'roomId' => $roomId,
-                'userId' => $userId
+                'userId' => $userId,
             ]);
 
             // 检查房间是否为空
@@ -174,8 +176,9 @@ class RoomService extends BaseService
             $this->logger->error('Error in leaveRoom', [
                 'error' => $e->getMessage(),
                 'roomId' => $roomId,
-                'userId' => $userId
+                'userId' => $userId,
             ]);
+
             throw $e;
         }
     }
@@ -185,7 +188,7 @@ class RoomService extends BaseService
         // 删除 Redis 数据
         $this->redisService->del([
             "room:$roomId:metadata",
-            "room:$roomId:participants"
+            "room:$roomId:participants",
         ]);
         // 从数据库中删除
         $room = $this->roomRepository->find($roomId);
@@ -205,15 +208,17 @@ class RoomService extends BaseService
             ]);
             if (empty($metadata)) {
                 $this->logger->warning('Room not found in Redis', ['roomId' => $roomId]);
+
                 return null;
             }
 
             // 从数据库获取完整信息
             $room = $this->roomRepository->findByRoomId($roomId);
-            if (!$room) {
+            if (! $room) {
                 $this->logger->warning('Room not found in database', ['roomId' => $roomId]);
                 // 如果数据库中没有，但Redis中有，我们应该清理Redis数据
                 $this->redisService->del(["room:$roomId:metadata", "room:$roomId:participants"]);
+
                 return null;
             }
 
@@ -221,8 +226,9 @@ class RoomService extends BaseService
         } catch (\Exception $e) {
             $this->logger->error('Error in findRoom', [
                 'error' => $e->getMessage(),
-                'roomId' => $roomId
+                'roomId' => $roomId,
             ]);
+
             throw $e;
         }
     }
@@ -246,13 +252,13 @@ class RoomService extends BaseService
 
             foreach ($participantIds as $userId) {
                 $participantData = $this->redisService->hGetAll("room:$roomId:participant:$userId");
-                if (!empty($participantData)) {
+                if (! empty($participantData)) {
                     $participants[] = [
                         'userId' => $userId,
                         'display' => $participantData['display'] ?? $userId,
                         'joinedAt' => $participantData['joinedAt'] ?? null,
                         'audioMuted' => (bool)($participantData['audioMuted'] ?? false),
-                        'isActive' => (bool)($participantData['isActive'] ?? true)
+                        'isActive' => (bool)($participantData['isActive'] ?? true),
                     ];
                 }
             }
@@ -261,8 +267,9 @@ class RoomService extends BaseService
         } catch (\Exception $e) {
             $this->logger->error('Error getting room participants', [
                 'error' => $e->getMessage(),
-                'roomId' => $roomId
+                'roomId' => $roomId,
             ]);
+
             throw $e;
         }
     }

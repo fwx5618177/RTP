@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\RoomEntity;
+use App\Exceptions\DatabaseException;
 use App\Exceptions\RoomException;
+use App\Logs\Logger;
 use App\Services\RedisService;
 use App\Utils\Container;
 use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\ORM\EntityManager;
-use App\Exceptions\DatabaseException;
-use App\Logs\Logger;
 
 class RoomRepository extends BaseRepository
 {
@@ -108,7 +108,7 @@ class RoomRepository extends BaseRepository
             $roomData = json_decode($roomData, true);
             $roomData['participants'] = array_filter(
                 $roomData['participants'],
-                fn($participant) => $participant !== $userId
+                fn ($participant) => $participant !== $userId
             );
             $this->redisService->set("room:{$roomId}", json_encode($roomData));
         }
@@ -139,17 +139,19 @@ class RoomRepository extends BaseRepository
     {
         try {
             return $this->executeInTransaction(function ($em) use ($room) {
-                if (!$em->contains($room)) {
+                if (! $em->contains($room)) {
                     $em->persist($room);
                 }
                 $em->flush();
+
                 return $room;
             });
         } catch (DatabaseException $e) {
             $this->logger->error('Failed to save room', [
                 'error' => $e->getMessage(),
-                'roomId' => $room->getRoomId()
+                'roomId' => $room->getRoomId(),
             ]);
+
             throw $e;
         }
     }

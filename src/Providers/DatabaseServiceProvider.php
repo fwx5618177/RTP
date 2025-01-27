@@ -104,7 +104,7 @@ class DatabaseServiceProvider
         $appConfig = \App\Config\Config::getInstance();
 
         // 如果没有提供连接，创建新的连接
-        if (!$connection) {
+        if (! $connection) {
             $dbType = $appConfig->get('DB_TYPE', 'mysql');
             $connection = \Doctrine\DBAL\DriverManager::getConnection([
                 'driver' => 'pdo_' . $dbType,

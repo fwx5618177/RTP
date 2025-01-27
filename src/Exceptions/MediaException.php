@@ -33,7 +33,7 @@ class MediaException extends Exception
             'code' => $this->code ?: 500,
             'message' => $this->message,
             'context' => $this->context,
-            'trace' => $this->getTraceAsString()
+            'trace' => $this->getTraceAsString(),
         ];
     }
 }

@@ -4,16 +4,17 @@ namespace App\Repository;
 
 use App\Exceptions\DatabaseException;
 use App\Logs\Logger;
+use App\Providers\DatabaseServiceProvider;
 use App\Utils\DBConnectionPool;
 use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\ORM\EntityRepository;
-use App\Providers\DatabaseServiceProvider;
 
 abstract class BaseRepository extends EntityRepository
 {
     protected DBConnectionPool $connectionPool;
     private int $maxRetries = 3;
     private Logger $logger;
+
     public function __construct($em, $class)
     {
         parent::__construct($em, $class);
@@ -38,7 +39,7 @@ abstract class BaseRepository extends EntityRepository
                 $em = DatabaseServiceProvider::createEntityManager($connection);
 
                 // 开始事务
-                if (!$connection->isTransactionActive()) {
+                if (! $connection->isTransactionActive()) {
                     $connection->beginTransaction();
                 }
 
