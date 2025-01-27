@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Config\Config;
 use App\DTO\RoomDTO;
 use App\Exceptions\RoomException;
 use App\Http\Request;
@@ -16,12 +17,16 @@ class RoomController extends BaseController
 {
     private RoomService $roomService;
     private Logger $logger;
+    private string $janusWsUrl;
+    private Config $config;
 
     public function __construct(ContainerInterface $container)
     {
         parent::__construct($container);
         $this->roomService = $container->get(RoomService::class);
         $this->logger = Logger::getInstance('room-controller');
+        $this->config = Config::getInstance();
+        $this->janusWsUrl = $this->config->get('JANUS_WS_ENDPOINT', 'ws://127.0.0.1:8188');
     }
 
     public function createRoom(Request $request): Response
@@ -69,8 +74,11 @@ class RoomController extends BaseController
                 'maxParticipants' => $data['config']['maxParticipants'] ?? 10,
                 'audioEnabled' => $data['config']['audioEnabled'] ?? true,
                 'videoEnabled' => $data['config']['videoEnabled'] ?? false,
-                'janusSessionId' => $room->getJanusSessionId(),
-                'janusHandleId' => $room->getJanusHandleId(),
+                'janus' => [
+                    'sessionId' => $room->getJanusSessionId(),
+                    'handleId' => $room->getJanusHandleId(),
+                    'wsUrl' => $this->janusWsUrl,
+                ],
             ];
 
             // 如果存在音频配置，添加到响应中
@@ -127,9 +135,23 @@ class RoomController extends BaseController
 
             $result = $this->roomService->joinRoom($roomId, $userId);
 
-            return (new Response())
-                ->setStatusCode(200)
-                ->setBody($result);
+            $this->logger->info('User joined room', [
+                'roomId' => $roomId,
+                'userId' => $userId,
+                'sessionId' => $result['sessionId'],
+                'handleId' => $result['handleId'],
+                "result" => $result
+            ]);
+
+            return $this->successResponse([
+                'roomId' => $roomId,
+                'userId' => $userId,
+                'janus' => [
+                    'sessionId' => $result['sessionId'],
+                    'handleId' => $result['handleId'],
+                    'wsUrl' => $this->janusWsUrl,
+                ],
+            ], 200);
         } catch (\Exception $e) {
             $this->logger->error('Failed to join room', [
                 'error' => $e->getMessage(),

@@ -54,6 +54,12 @@ class RoomService extends BaseService
                 $roomDTO->getUserId()
             );
 
+            $this->logger->info('Room created', [
+                'roomId' => $mediaInfo['roomId'],
+                'sessionId' => $mediaInfo['sessionId'],
+                'handleId' => $mediaInfo['handleId'],
+            ]);
+
             // 创建房间实体
             $roomEntity = new RoomEntity(
                 (string)$mediaInfo['roomId'],
@@ -71,6 +77,13 @@ class RoomService extends BaseService
 
             // 保存到数据库
             $savedRoom = $this->roomRepository->save($roomEntity);
+
+            $this->logger->info('Room saved', [
+                'roomId' => $savedRoom->getRoomId(),
+                'roomName' => $savedRoom->getRoomName(),
+                'sessionId' => $savedRoom->getJanusSessionId(),
+                'handleId' => $savedRoom->getJanusHandleId(),
+            ]);
 
             // 保存扩展配置到 Redis
             $roomKey = "room:{$mediaInfo['roomId']}:metadata";
