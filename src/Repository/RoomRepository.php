@@ -108,7 +108,7 @@ class RoomRepository extends BaseRepository
             $roomData = json_decode($roomData, true);
             $roomData['participants'] = array_filter(
                 $roomData['participants'],
-                fn ($participant) => $participant !== $userId
+                fn($participant) => $participant !== $userId
             );
             $this->redisService->set("room:{$roomId}", json_encode($roomData));
         }
@@ -138,6 +138,7 @@ class RoomRepository extends BaseRepository
     public function save(RoomEntity $room): RoomEntity
     {
         try {
+            $this->logger->info('Saving room', ['room' => $room]);
             return $this->executeInTransaction(function ($em) use ($room) {
                 if (! $em->contains($room)) {
                     $em->persist($room);

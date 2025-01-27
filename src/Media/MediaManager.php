@@ -234,8 +234,8 @@ class MediaManager
 
             return [
                 'roomId' => $roomId,
-                'sessionId' => $this->sessionId,
-                'handleId' => $this->handleId,
+                'janus_session_id' => $this->sessionId,
+                'janus_handle_id' => $this->handleId,
                 'config' => $roomConfig,
                 'janusResponse' => $response,
             ];

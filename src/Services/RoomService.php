@@ -56,8 +56,8 @@ class RoomService extends BaseService
 
             $this->logger->info('Room created', [
                 'roomId' => $mediaInfo['roomId'],
-                'sessionId' => $mediaInfo['sessionId'],
-                'handleId' => $mediaInfo['handleId'],
+                'janus_session_id' => $mediaInfo['janus_session_id'],
+                'janus_handle_id' => $mediaInfo['janus_handle_id'],
             ]);
 
             // 创建房间实体
@@ -65,8 +65,8 @@ class RoomService extends BaseService
                 (string)$mediaInfo['roomId'],
                 $roomDTO->getRoomName(),
                 $roomDTO->getUserId(),
-                $mediaInfo['sessionId'],
-                $mediaInfo['handleId'],
+                $mediaInfo['janus_session_id'],
+                $mediaInfo['janus_handle_id'],
                 $roomDTO->getConfig()['maxParticipants'] ?? 10
             );
 

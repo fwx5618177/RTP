@@ -111,11 +111,18 @@ class RoomController extends BaseController
         try {
             $data = $request->getBodyParams();
 
+            // 添加请求数据日志
+            $this->logger->info('Join room request data', [
+                'method' => $request->getMethod(),
+                'headers' => $request->getHeaders(),
+                'body' => $data,
+                'raw' => $request->getBodyParams()
+            ]);
+
             // Validate required parameters
             if (empty($data['roomId'])) {
-                return (new Response())
-                    ->setStatusCode(400)
-                    ->setBody(['error' => 'roomId is required']);
+                $this->logger->warning('roomId is required but was empty', ['data' => $data]);
+                return $this->errorResponse('roomId is required', 400);
             }
 
             if (empty($data['userId'])) {
@@ -133,13 +140,21 @@ class RoomController extends BaseController
                 return $this->handleSipCall($request, $roomId, $userId);
             }
 
+            // 新增：获取房间信息，以获取 sessionId 和 handleId
+            $room = $this->roomService->findRoom($roomId);
+            if (!$room) {
+                return $this->errorResponse('Room not found', 404);
+            }
+
+            // 使用房间的 sessionId 和 handleId
             $result = $this->roomService->joinRoom($roomId, $userId);
 
+            // 使用房间实体中的 sessionId 和 handleId
             $this->logger->info('User joined room', [
                 'roomId' => $roomId,
                 'userId' => $userId,
-                'sessionId' => $result['sessionId'],
-                'handleId' => $result['handleId'],
+                'sessionId' => $room->getJanusSessionId(),  // 使用房间实体的 sessionId
+                'handleId' => $room->getJanusHandleId(),    // 使用房间实体的 handleId
                 "result" => $result
             ]);
 
@@ -147,8 +162,8 @@ class RoomController extends BaseController
                 'roomId' => $roomId,
                 'userId' => $userId,
                 'janus' => [
-                    'sessionId' => $result['sessionId'],
-                    'handleId' => $result['handleId'],
+                    'sessionId' => $room->getJanusSessionId(),  // 使用房间实体的 sessionId
+                    'handleId' => $room->getJanusHandleId(),    // 使用房间实体的 handleId
                     'wsUrl' => $this->janusWsUrl,
                 ],
             ], 200);

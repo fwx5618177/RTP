@@ -236,7 +236,30 @@ class Request
 
     public function getBodyParams(): array
     {
-        return $this->bodyParams;
+        if ($this->method === self::METHOD_GET || $this->method === self::METHOD_HEAD) {
+            return [];
+        }
+
+        $contentType = $this->getHeader('content-type') ?? '';
+
+        // 记录请求内容类型和原始数据
+        $this->logger->debug('Parsing request body', [
+            'contentType' => $contentType,
+            'rawBody' => $this->rawBody,
+        ]);
+
+        if (strpos($contentType, 'application/json') !== false) {
+            $data = json_decode($this->rawBody, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $data;
+            }
+            $this->logger->error('JSON decode error', [
+                'error' => json_last_error_msg(),
+                'rawBody' => $this->rawBody,
+            ]);
+        }
+
+        return [];
     }
 
     public function getHeaders(): array
