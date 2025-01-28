@@ -57,7 +57,7 @@ export default function Room() {
     try {
       setLoading(true);
       const response = await roomApi.getRoom(roomId!);
-      console.log("Room response:", response); // 用于调试
+      console.log("Room response:", response);
 
       // 检查响应结构
       if (!response?.data?.data) {
@@ -86,10 +86,29 @@ export default function Room() {
         const client = new JanusClient({
           sessionId: roomData.janusSessionId,
           handleId: roomData.janusHandleId,
-          wsUrl: roomData.wsUrl, // 直接使用接口返回的 wsUrl
+          wsUrl: roomData.wsUrl,
         });
 
-        await client.connect();
+        // 添加重试逻辑
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        while (retryCount < maxRetries) {
+          try {
+            await client.connect();
+            break; // 连接成功，跳出循环
+          } catch (error) {
+            retryCount++;
+            console.warn(`Connection attempt ${retryCount} failed:`, error);
+
+            if (retryCount === maxRetries) {
+              throw error; // 达到最大重试次数，抛出错误
+            }
+
+            // 等待一段时间后重试
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        }
 
         // 获取音频流
         const stream = await navigator.mediaDevices.getUserMedia({

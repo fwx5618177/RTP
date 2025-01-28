@@ -41,6 +41,12 @@ export class JanusClient {
 
   public async connect(): Promise<void> {
     try {
+      console.log("Connecting to Janus with config:", {
+        wsUrl: this.config.wsUrl,
+        sessionId: this.config.sessionId,
+        handleId: this.config.handleId,
+      });
+
       await this.wsManager.connect();
 
       // 发送 attach 请求
@@ -52,10 +58,32 @@ export class JanusClient {
         transaction: this.generateTransactionId(),
       });
 
-      this.connected = true;
+      // 等待 attach 成功响应
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Attach request timeout"));
+        }, 5000);
+
+        this.wsManager.addMessageHandler("success", (message: JanusMessage) => {
+          if (
+            message.transaction &&
+            message.session_id === this.config.sessionId
+          ) {
+            clearTimeout(timeout);
+            this.connected = true;
+            resolve();
+          }
+        });
+
+        this.wsManager.addMessageHandler("error", (message: JanusMessage) => {
+          clearTimeout(timeout);
+          reject(new Error(`Janus error: ${JSON.stringify(message)}`));
+        });
+      });
     } catch (error) {
-      console.error("Failed to connect to Janus:", error);
-      throw error;
+      const errorMessage = `Failed to connect to Janus: ${error instanceof Error ? error.message : "Unknown error"}`;
+      console.error(errorMessage);
+      throw new Error(errorMessage);
     }
   }
 

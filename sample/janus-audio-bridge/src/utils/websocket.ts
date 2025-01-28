@@ -17,33 +17,57 @@ export class WebSocketManager {
   private messageHandlers: Map<string, (message: JanusMessage) => void> =
     new Map();
 
-  constructor(private url: string) {}
+  constructor(private url: string) {
+    console.log("Initializing WebSocket with URL:", url);
+  }
 
   public connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+        console.log("Attempting to connect to:", this.url);
         this.ws = new WebSocket(this.url);
 
         this.ws.onopen = () => {
-          console.log("WebSocket connected");
+          console.log("WebSocket successfully connected");
           resolve();
         };
 
         this.ws.onmessage = (event) => {
-          const message: JanusMessage = JSON.parse(event.data);
-          this.handleMessage(message);
+          try {
+            const message: JanusMessage = JSON.parse(event.data);
+            console.log("Received WebSocket message:", message);
+            this.handleMessage(message);
+          } catch (error) {
+            console.error("Failed to parse WebSocket message:", error);
+          }
         };
 
         this.ws.onerror = (error) => {
-          console.error("WebSocket error:", error);
-          reject(error);
+          const errorMessage = `WebSocket connection error: ${error instanceof Error ? error.message : "Unknown error"}`;
+          console.error(errorMessage);
+          reject(new Error(errorMessage));
         };
 
-        this.ws.onclose = () => {
-          console.log("WebSocket closed");
+        this.ws.onclose = (event) => {
+          console.log("WebSocket closed:", {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean,
+          });
         };
+
+        setTimeout(() => {
+          if (this.ws?.readyState !== WebSocket.OPEN) {
+            const timeoutError = new Error("WebSocket connection timeout");
+            console.error(timeoutError);
+            this.ws?.close();
+            reject(timeoutError);
+          }
+        }, 5000);
       } catch (error) {
-        reject(error);
+        const errorMessage = `Failed to create WebSocket: ${error instanceof Error ? error.message : "Unknown error"}`;
+        console.error(errorMessage);
+        reject(new Error(errorMessage));
       }
     });
   }
