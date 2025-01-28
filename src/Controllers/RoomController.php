@@ -357,6 +357,7 @@ class RoomController extends BaseController
                 'janusSessionId' => $room->getJanusSessionId(),
                 'janusHandleId' => $room->getJanusHandleId(),
                 'participantsCount' => $this->roomService->getParticipantsCount($roomId),
+                'wsUrl' => $this->janusWsUrl,
             ];
 
             // 如果存在音频配置，添加到响应中

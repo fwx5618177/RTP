@@ -1,11 +1,5 @@
 import axios from "axios";
-import {
-  ApiResponse,
-  Room,
-  Participant,
-  CreateRoomRequest,
-  JoinRoomRequest,
-} from "../types/api";
+import { ApiResponse, Room, Participant } from "../types/api";
 
 const api = axios.create({
   baseURL: "/api",

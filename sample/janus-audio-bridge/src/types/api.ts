@@ -1,12 +1,8 @@
 export interface ApiResponse<T = any> {
-  data: {
-    success: boolean;
-    data: T;
-    code: number;
-    time: number;
-  };
-  status: number;
-  statusText: string;
+  success: boolean;
+  data: T;
+  code: number;
+  time: number;
 }
 
 export interface Room {

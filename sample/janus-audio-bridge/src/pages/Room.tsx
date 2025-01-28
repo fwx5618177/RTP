@@ -60,11 +60,11 @@ export default function Room() {
       console.log("Room response:", response); // 用于调试
 
       // 检查响应结构
-      if (!response?.data?.data?.data) {
+      if (!response?.data?.data) {
         throw new Error("Invalid response format");
       }
 
-      const roomData = response.data.data.data;
+      const roomData = response.data.data;
 
       // 检查必要的字段
       if (!roomData.roomId || !roomData.name) {
@@ -140,7 +140,7 @@ export default function Room() {
   const loadParticipants = async () => {
     try {
       const response = await roomApi.getParticipants(roomId!);
-      setParticipants(response.data.data.data);
+      setParticipants(response.data.data);
     } catch (error) {
       console.error("Failed to load participants:", error);
     }

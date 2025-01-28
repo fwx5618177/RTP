@@ -54,7 +54,6 @@ export default function Home() {
           },
         },
       });
-      console.log("response:", response.data.data);
 
       navigate(`/room/${response.data.data.roomId}`);
     } catch (err) {
