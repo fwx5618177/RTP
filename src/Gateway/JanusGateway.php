@@ -7,66 +7,123 @@ namespace App\Gateway;
 use App\Config\Config;
 use App\Exceptions\GatewayException;
 use App\Logs\Logger;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 
 class JanusGateway
 {
     private Logger $logger;
     private Config $config;
-    private string $apiEndpoint;
+    private string $baseUrl;
     private string $apiSecret;
+    private Client $client;
 
     public function __construct()
     {
         $this->logger = Logger::getInstance('janus-gateway');
         $this->config = Config::getInstance();
-        $this->apiEndpoint = $this->config->get('JANUS_HTTP_ENDPOINT', 'http://127.0.0.1:8088/janus');
+        $this->baseUrl = $this->config->get('JANUS_HTTP_ENDPOINT', 'http://127.0.0.1:8088/janus');
         $this->apiSecret = $this->config->get('JANUS_API_SECRET', 'janusrocks');
+
+        $this->client = new Client([
+            'base_uri' => $this->baseUrl,
+            'timeout' => 5.0,
+        ]);
     }
 
+    /**
+     * 发送请求到 Janus 服务器
+     */
+    public function sendRequest(string $endpoint, array $data): array
+    {
+        try {
+            // 添加 API Secret
+            $data['apisecret'] = $this->apiSecret;
+
+            // 确保 endpoint 以 / 开头
+            $endpoint = ltrim($endpoint, '/');
+            $url = $endpoint ? "{$this->baseUrl}/{$endpoint}" : $this->baseUrl;
+
+            $this->logger->debug("Sending request to Janus", [
+                'url' => $url,
+                'data' => $data
+            ]);
+
+            $response = $this->client->post($url, [
+                'json' => $data
+            ]);
+
+            $result = json_decode($response->getBody()->getContents(), true);
+
+            if (!$result) {
+                throw new \Exception('Invalid response from Janus server');
+            }
+
+            return $result;
+        } catch (GuzzleException $e) {
+            $this->logger->error("Janus request failed", [
+                'error' => $e->getMessage(),
+                'endpoint' => $endpoint,
+                'data' => $data
+            ]);
+            throw new \Exception('Failed to communicate with Janus: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 创建 Janus 会话
+     */
     public function createSession(): array
     {
-        $createSession = [
-            "janus" => "create",
-            "transaction" => $this->generateTransactionId(),
-            "apisecret" => $this->apiSecret,
-        ];
-
-        return $this->sendRequest($this->apiEndpoint, $createSession);
+        return $this->sendRequest('', [
+            'janus' => 'create',
+            'transaction' => $this->generateTransactionId()
+        ]);
     }
 
-    public function attachPlugin(string $sessionId, string $plugin = 'janus.plugin.audiobridge'): array
+    /**
+     * 附加到 AudioBridge 插件
+     */
+    public function attachPlugin(string $sessionId): array
     {
-        $attachPlugin = [
-            "janus" => "attach",
-            "plugin" => $plugin,
-            "transaction" => $this->generateTransactionId(),
-            "apisecret" => $this->apiSecret,
-        ];
-
-        return $this->sendRequest("$this->apiEndpoint/$sessionId", $attachPlugin);
+        // 确保正确的路径格式
+        return $this->sendRequest("$sessionId", [
+            'janus' => 'attach',
+            'plugin' => 'janus.plugin.audiobridge',
+            'transaction' => $this->generateTransactionId()
+        ]);
     }
 
-    public function createRoom(string $sessionId, string $handleId, array $roomConfig): array
+    /**
+     * 创建音频房间
+     */
+    public function createRoom(string $sessionId, string $handleId, array $config): array
     {
-        $createRoom = [
-            "janus" => "message",
-            "body" => array_merge([
-                "request" => "create",
-                "sampling_rate" => 16000,
-                "spatial_audio" => false,
-                "record" => false,
-                "permanent" => false,
-            ], $roomConfig),
-            "transaction" => $this->generateTransactionId(),
-            "apisecret" => $this->apiSecret,
-        ];
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'create',
+                'room' => $config['roomId'],
+                'description' => $config['description'] ?? '',
+                'sampling_rate' => $config['sampling_rate'] ?? 16000,
+                'spatial_audio' => $config['spatial_audio'] ?? false,
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
 
-        return $this->sendRequest("$this->apiEndpoint/$sessionId/$handleId", $createRoom);
+    /**
+     * 生成事务ID
+     */
+    private function generateTransactionId(): string
+    {
+        return bin2hex(random_bytes(16));
     }
 
     public function joinRoom(string $sessionId, string $handleId, int $roomId, string $display): array
     {
-        $joinRoom = [
+        // 修复 URL 构造
+        return $this->sendRequest("$sessionId/$handleId", [
             "janus" => "message",
             "body" => [
                 "request" => "join",
@@ -74,48 +131,7 @@ class JanusGateway
                 "display" => $display,
                 "muted" => false,
             ],
-            "transaction" => $this->generateTransactionId(),
-            "apisecret" => $this->apiSecret,
-        ];
-
-        return $this->sendRequest("$this->apiEndpoint/$sessionId/$handleId", $joinRoom);
-    }
-
-    private function generateTransactionId(): string
-    {
-        return "txid" . rand(1000000, 9999999);
-    }
-
-    private function sendRequest(string $url, array $data): array
-    {
-        $ch = curl_init($url);
-
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($data),
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_TIMEOUT => 10,
+            "transaction" => $this->generateTransactionId()
         ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-        if ($response === false) {
-            throw new GatewayException('Curl error: ' . curl_error($ch));
-        }
-
-        curl_close($ch);
-
-        if ($httpCode >= 400) {
-            throw new GatewayException("HTTP error $httpCode: $response");
-        }
-
-        $decoded = json_decode($response, true);
-        if ($decoded === null) {
-            throw new GatewayException("Invalid JSON response: $response");
-        }
-
-        return $decoded;
     }
 }

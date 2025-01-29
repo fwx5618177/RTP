@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Config;
 
 use App\Controllers\HomeController;
+use App\Controllers\JanusController;
 use App\Controllers\RedisController;
 use App\Controllers\RoomController;
 use App\Controllers\UserController;
 use App\Controllers\WebSocketController;
+use App\Http\Response;
+use App\Middlewares\CorsMiddleware;
 use App\Middlewares\TestConditionMiddleware;
 use App\Middlewares\TestFlowMiddleware;
 use App\Routes\Router;
@@ -16,6 +19,7 @@ use App\Routes\Router;
 return function (Router $router) {
     // 添加全局中间件
     $router->addGlobalMiddleware(new TestFlowMiddleware());
+    $router->addGlobalMiddleware(new CorsMiddleware());
 
     // 基础路由
     $router->add('GET', '/', [HomeController::class, 'index'], [new TestConditionMiddleware()]);
@@ -73,5 +77,14 @@ return function (Router $router) {
 
         // SIP 相关
         $route->add('POST', '/sip', [RoomController::class, 'joinRoom']);
+    });
+
+    // Janus WebRTC 相关路由组
+    $router->group([
+        'prefix' => '/api/janus',
+        'middleware' => [],
+    ], function ($route) {
+        $route->add('POST', '/{sessionId}/{handleId}', [JanusController::class, 'handleMessage']);
+        $route->add('POST', '/{sessionId}/{handleId}/trickle', [JanusController::class, 'handleTrickle']);
     });
 };

@@ -54,77 +54,53 @@ export default function Room() {
   }, [roomId]);
 
   const loadRoomDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await roomApi.getRoom(roomId!);
-      console.log("Room response:", response);
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 2000;
 
-      // 检查响应结构
-      if (!response?.data?.data) {
-        throw new Error("Invalid response format");
-      }
-
-      const roomData = response.data.data;
-
-      // 检查必要的字段
-      if (!roomData.roomId || !roomData.name) {
-        throw new Error("Missing required room data");
-      }
-
-      setRoom(roomData);
-
-      // 检查 Janus 配置
-      if (
-        !roomData.janusSessionId ||
-        !roomData.janusHandleId ||
-        !roomData.wsUrl
-      ) {
-        throw new Error("Missing Janus configuration");
-      }
-
+    while (retryCount < maxRetries) {
       try {
+        setLoading(true);
+        const response = await roomApi.getRoom(roomId!);
+        console.log("Room response:", response);
+
+        // 检查响应结构
+        if (!response?.data?.data) {
+          throw new Error("Invalid response format");
+        }
+
+        const roomData = response.data.data;
+
+        // 检查必要的字段
+        if (!roomData.roomId || !roomData.name) {
+          throw new Error("Missing required room data");
+        }
+
+        setRoom(roomData);
+
+        // 检查 Janus 配置
+        if (!roomData?.janusSessionId || !roomData?.janusHandleId) {
+          throw new Error("Missing Janus configuration");
+        }
+
         const client = new JanusClient({
           sessionId: roomData.janusSessionId,
           handleId: roomData.janusHandleId,
-          wsUrl: roomData.wsUrl,
         });
 
-        // 添加重试逻辑
-        let retryCount = 0;
-        const maxRetries = 3;
+        await client.initializeMedia();
 
-        while (retryCount < maxRetries) {
-          try {
-            await client.connect();
-            break; // 连接成功，跳出循环
-          } catch (error) {
-            retryCount++;
-            console.warn(`Connection attempt ${retryCount} failed:`, error);
+        // 所有用户都是加入房间，因为房间已经在后端创建好了
+        const currentUser = localStorage.getItem("userId") || "anonymous";
+        await client.joinRoom(roomId!, currentUser);
 
-            if (retryCount === maxRetries) {
-              throw error; // 达到最大重试次数，抛出错误
-            }
-
-            // 等待一段时间后重试
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-          }
-        }
-
-        // 获取音频流
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        });
+        const stream = client.getLocalStream();
         setAudioStream(stream);
 
-        // 设置状态变化回调
         client.setOnStateChange(({ isMuted: muted }) => {
           setIsMuted(muted);
           if (stream) {
-            stream.getAudioTracks().forEach((track) => {
+            stream.getAudioTracks().forEach((track: MediaStreamTrack) => {
               track.enabled = !muted;
             });
           }
@@ -132,27 +108,29 @@ export default function Room() {
 
         setJanusClient(client);
 
-        // 先设置客户端，再加入房间
-        await client.joinRoom(roomId!, roomData.creator);
-
-        // 立即加载参与者列表
+        // 加载参与者列表
         await loadParticipants();
+        break; // 成功后跳出循环
       } catch (error) {
-        throw new Error(
-          `Failed to initialize Janus client: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
+        retryCount++;
+        console.warn(
+          `Attempt ${retryCount}/${maxRetries} failed:`,
+          error instanceof Error ? error.message : "Unknown error"
         );
+
+        if (retryCount === maxRetries) {
+          setError(
+            `Failed to initialize Janus client after ${maxRetries} attempts: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`
+          );
+          throw error;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Failed to load room details:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to join the room. Please try again."
-      );
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -170,7 +148,7 @@ export default function Room() {
       await janusClient?.configure({ muted: !isMuted });
 
       if (audioStream) {
-        audioStream.getAudioTracks().forEach((track) => {
+        audioStream.getAudioTracks().forEach((track: MediaStreamTrack) => {
           track.enabled = !isMuted;
         });
       }

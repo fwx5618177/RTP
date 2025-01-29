@@ -1,134 +1,225 @@
 import { WebSocketManager, JanusMessage } from "../utils/websocket";
+import axios from "axios";
 
 interface JanusConfig {
   sessionId: string;
   handleId: string;
-  wsUrl: string;
 }
 
 export class JanusClient {
-  private wsManager: WebSocketManager;
+  private peerConnection: RTCPeerConnection | null = null;
+  private localStream: MediaStream | null = null;
   private config: JanusConfig;
-  private connected: boolean = false;
   private onStateChange?: (state: { isMuted: boolean }) => void;
+  private connected: boolean = false;
+  private baseUrl: string;
 
   constructor(config: JanusConfig) {
     this.config = config;
-    this.wsManager = new WebSocketManager(config.wsUrl);
-    this.setupMessageHandlers();
+    this.baseUrl = "http://localhost:9501";
+    this.initializePeerConnection();
   }
 
-  private setupMessageHandlers(): void {
-    this.wsManager.addMessageHandler("success", (message: JanusMessage) => {
-      console.log("Janus success:", message);
+  private initializePeerConnection() {
+    this.peerConnection = new RTCPeerConnection({
+      iceServers: [], // 局域网不需要 STUN/TURN 服务器
     });
 
-    this.wsManager.addMessageHandler("error", (message: JanusMessage) => {
-      console.error("Janus error:", message);
-    });
+    this.peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        this.sendTrickle(event.candidate);
+      }
+    };
 
-    this.wsManager.addMessageHandler("event", (message: JanusMessage) => {
-      if (message.plugindata?.data.audiobridge === "event") {
-        // 处理音频事件
-        const event = message.plugindata.data;
-        if (event.result?.participants) {
-          // 更新参与者状态
-          console.log("Participants updated:", event.result.participants);
+    this.peerConnection.ontrack = (event) => {
+      console.log("Received remote track:", event.track);
+      const audio = new Audio();
+      audio.srcObject = event.streams[0];
+      audio.play();
+    };
+  }
+
+  private async retryOperation<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    delayMs: number = 2000
+  ): Promise<T> {
+    let lastError: Error;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.warn(
+          `Attempt ${attempt}/${maxRetries} failed:`,
+          lastError.message
+        );
+
+        if (attempt === maxRetries) {
+          throw new Error(
+            `Operation failed after ${maxRetries} attempts: ${lastError.message}`
+          );
         }
+
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+
+    throw lastError!; // TypeScript 需要这行，实际上不会执行到这里
+  }
+
+  // 初始化媒体流
+  public async initializeMedia(): Promise<void> {
+    return this.retryOperation(async () => {
+      try {
+        this.localStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          video: false,
+        });
+
+        this.localStream.getTracks().forEach((track) => {
+          this.peerConnection?.addTrack(track, this.localStream!);
+        });
+      } catch (error) {
+        console.error("Failed to initialize media:", error);
+        throw error;
       }
     });
   }
 
-  public async connect(): Promise<void> {
-    try {
-      console.log("Connecting to Janus with config:", {
-        wsUrl: this.config.wsUrl,
-        sessionId: this.config.sessionId,
-        handleId: this.config.handleId,
-      });
+  // 加入房间
+  public async joinRoom(roomId: string, display: string): Promise<void> {
+    return this.retryOperation(async () => {
+      try {
+        // 添加请求配置
+        const requestConfig = {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          withCredentials: true,
+        };
 
-      await this.wsManager.connect();
+        // 1. 发送加入房间请求
+        const joinResponse = await axios.post(
+          `${this.baseUrl}/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+          {
+            janus: "message",
+            body: {
+              request: "join",
+              room: parseInt(roomId),
+              display: display,
+              muted: false,
+            },
+          },
+          requestConfig
+        );
 
-      // 发送 attach 请求
-      this.wsManager.send({
-        janus: "attach",
-        session_id: this.config.sessionId,
-        handle_id: this.config.handleId,
-        plugin: "janus.plugin.audiobridge",
-        transaction: this.generateTransactionId(),
-      });
+        console.log("Join room response:", joinResponse);
 
-      // 等待 attach 成功响应
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error("Attach request timeout"));
-        }, 5000);
-
-        this.wsManager.addMessageHandler("success", (message: JanusMessage) => {
-          if (
-            message.transaction &&
-            message.session_id === this.config.sessionId
-          ) {
-            clearTimeout(timeout);
-            this.connected = true;
-            resolve();
-          }
+        // 2. 创建并发送 Offer
+        const offer = await this.peerConnection!.createOffer({
+          offerToReceiveAudio: true,
         });
+        await this.peerConnection!.setLocalDescription(offer);
 
-        this.wsManager.addMessageHandler("error", (message: JanusMessage) => {
-          clearTimeout(timeout);
-          reject(new Error(`Janus error: ${JSON.stringify(message)}`));
-        });
-      });
-    } catch (error) {
-      const errorMessage = `Failed to connect to Janus: ${error instanceof Error ? error.message : "Unknown error"}`;
-      console.error(errorMessage);
-      throw new Error(errorMessage);
-    }
+        // 3. 发送 Offer 到 Janus（同样添加请求配置）
+        const offerResponse = await axios.post(
+          `${this.baseUrl}/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+          {
+            janus: "message",
+            body: {
+              request: "configure",
+              room: parseInt(roomId),
+              audio: true,
+              video: false,
+            },
+            jsep: offer,
+          },
+          requestConfig
+        );
+
+        console.log("Offer response:", offerResponse);
+
+        // 4. 处理 Janus 的 Answer
+        if (offerResponse.data.jsep) {
+          await this.peerConnection!.setRemoteDescription(
+            new RTCSessionDescription(offerResponse.data.jsep)
+          );
+          this.connected = true;
+        } else {
+          throw new Error("No JSEP in response");
+        }
+
+        // 5. 获取并处理房间状态信息
+        if (offerResponse.data.plugindata?.data?.participants) {
+          console.log(
+            "Current participants:",
+            offerResponse.data.plugindata.data.participants
+          );
+        }
+      } catch (error) {
+        console.error("Failed to join room:", error);
+        throw error;
+      }
+    });
   }
 
-  public async joinRoom(roomId: string, display: string): Promise<void> {
-    if (!this.connected) {
-      throw new Error("Not connected to Janus");
+  private async sendTrickle(candidate: RTCIceCandidate) {
+    try {
+      await axios.post(
+        `${this.baseUrl}/api/janus/${this.config.sessionId}/${this.config.handleId}/trickle`,
+        {
+          candidate: candidate,
+        }
+      );
+    } catch (error) {
+      console.error("Failed to send trickle:", error);
     }
-
-    this.wsManager.send({
-      janus: "message",
-      session_id: this.config.sessionId,
-      handle_id: this.config.handleId,
-      body: {
-        request: "join",
-        room: parseInt(roomId),
-        display: display,
-        muted: false,
-      },
-      transaction: this.generateTransactionId(),
-    });
   }
 
   public async configure(options: {
     muted: boolean;
     quality?: number;
   }): Promise<void> {
-    if (!this.connected) {
-      throw new Error("Not connected to Janus");
-    }
+    return this.retryOperation(async () => {
+      try {
+        if (!this.connected) {
+          throw new Error("Not connected to room");
+        }
 
-    this.wsManager.send({
-      janus: "message",
-      session_id: this.config.sessionId,
-      handle_id: this.config.handleId,
-      body: {
-        request: "configure",
-        muted: options.muted,
-        quality: options.quality || 1.0,
-      },
-      transaction: this.generateTransactionId(),
+        // 更新本地音频轨道状态
+        if (this.localStream) {
+          this.localStream.getAudioTracks().forEach((track) => {
+            track.enabled = !options.muted;
+          });
+        }
+
+        // 发送配置请求到 Janus
+        await axios.post(
+          `${this.baseUrl}/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+          {
+            janus: "message",
+            body: {
+              request: "configure",
+              muted: options.muted,
+              quality: options.quality || 1.0,
+            },
+          }
+        );
+
+        if (this.onStateChange) {
+          this.onStateChange({ isMuted: options.muted });
+        }
+      } catch (error) {
+        console.error("Failed to configure:", error);
+        throw error;
+      }
     });
-
-    if (this.onStateChange) {
-      this.onStateChange({ isMuted: options.muted });
-    }
   }
 
   public setOnStateChange(
@@ -138,21 +229,51 @@ export class JanusClient {
   }
 
   public disconnect(): void {
-    if (this.connected) {
-      // 发送 detach 请求
-      this.wsManager.send({
-        janus: "detach",
-        session_id: this.config.sessionId,
-        handle_id: this.config.handleId,
-        transaction: this.generateTransactionId(),
-      });
-
-      this.wsManager.disconnect();
-      this.connected = false;
+    if (this.localStream) {
+      this.localStream.getTracks().forEach((track) => track.stop());
     }
+    if (this.peerConnection) {
+      this.peerConnection.close();
+    }
+    this.peerConnection = null;
+    this.localStream = null;
+    this.connected = false;
   }
 
-  private generateTransactionId(): string {
-    return Math.random().toString(36).substring(2, 15);
+  public getLocalStream(): MediaStream | null {
+    return this.localStream;
+  }
+
+  public async createRoom(roomId: string, display: string): Promise<void> {
+    return this.retryOperation(async () => {
+      try {
+        // 1. 创建房间请求
+        const createResponse = await axios.post(
+          `${this.baseUrl}/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+          {
+            janus: "message",
+            body: {
+              request: "create",
+              room: parseInt(roomId),
+              description: `Room created by ${display}`,
+              sampling_rate: 16000,
+              spatial_audio: false,
+            },
+          }
+        );
+
+        if (createResponse.data.error) {
+          throw new Error(
+            `Failed to create room: ${createResponse.data.error}`
+          );
+        }
+
+        // 2. 创建成功后，作为创建者加入房间
+        await this.joinRoom(roomId, display);
+      } catch (error) {
+        console.error("Failed to create room:", error);
+        throw error;
+      }
+    });
   }
 }
