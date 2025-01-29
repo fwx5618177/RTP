@@ -10,6 +10,7 @@ use App\Controllers\RedisController;
 use App\Controllers\RoomController;
 use App\Controllers\UserController;
 use App\Controllers\WebSocketController;
+use App\Controllers\OptionsController;
 use App\Http\Response;
 use App\Middlewares\CorsMiddleware;
 use App\Middlewares\TestConditionMiddleware;
@@ -84,6 +85,11 @@ return function (Router $router) {
         'prefix' => '/api/janus',
         'middleware' => [],
     ], function ($route) {
+        // OPTIONS 请求使用控制器处理
+        $route->add('OPTIONS', '/{sessionId}/{handleId}', [OptionsController::class, 'handle']);
+        $route->add('OPTIONS', '/{sessionId}/{handleId}/trickle', [OptionsController::class, 'handle']);
+
+        // 原有的路由
         $route->add('POST', '/{sessionId}/{handleId}', [JanusController::class, 'handleMessage']);
         $route->add('POST', '/{sessionId}/{handleId}/trickle', [JanusController::class, 'handleTrickle']);
     });

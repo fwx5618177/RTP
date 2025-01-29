@@ -12,11 +12,9 @@ export class JanusClient {
   private config: JanusConfig;
   private onStateChange?: (state: { isMuted: boolean }) => void;
   private connected: boolean = false;
-  private baseUrl: string;
 
   constructor(config: JanusConfig) {
     this.config = config;
-    this.baseUrl = "http://localhost:9501";
     this.initializePeerConnection();
   }
 
@@ -92,31 +90,30 @@ export class JanusClient {
     });
   }
 
+  private generateTransactionId(): string {
+    return (
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15)
+    );
+  }
+
   // 加入房间
   public async joinRoom(roomId: string, display: string): Promise<void> {
     return this.retryOperation(async () => {
       try {
-        // 添加请求配置
-        const requestConfig = {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          withCredentials: true,
-        };
-
         // 1. 发送加入房间请求
         const joinResponse = await axios.post(
-          `${this.baseUrl}/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+          `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
           {
             janus: "message",
+            transaction: this.generateTransactionId(),
             body: {
               request: "join",
               room: parseInt(roomId),
               display: display,
               muted: false,
             },
-          },
-          requestConfig
+          }
         );
 
         console.log("Join room response:", joinResponse);
@@ -127,11 +124,12 @@ export class JanusClient {
         });
         await this.peerConnection!.setLocalDescription(offer);
 
-        // 3. 发送 Offer 到 Janus（同样添加请求配置）
+        // 3. 发送 Offer 到 Janus
         const offerResponse = await axios.post(
-          `${this.baseUrl}/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+          `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
           {
             janus: "message",
+            transaction: this.generateTransactionId(),
             body: {
               request: "configure",
               room: parseInt(roomId),
@@ -139,8 +137,7 @@ export class JanusClient {
               video: false,
             },
             jsep: offer,
-          },
-          requestConfig
+          }
         );
 
         console.log("Offer response:", offerResponse);
@@ -172,8 +169,10 @@ export class JanusClient {
   private async sendTrickle(candidate: RTCIceCandidate) {
     try {
       await axios.post(
-        `${this.baseUrl}/api/janus/${this.config.sessionId}/${this.config.handleId}/trickle`,
+        `/api/janus/${this.config.sessionId}/${this.config.handleId}/trickle`,
         {
+          janus: "trickle",
+          transaction: this.generateTransactionId(),
           candidate: candidate,
         }
       );
@@ -201,9 +200,10 @@ export class JanusClient {
 
         // 发送配置请求到 Janus
         await axios.post(
-          `${this.baseUrl}/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+          `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
           {
             janus: "message",
+            transaction: this.generateTransactionId(),
             body: {
               request: "configure",
               muted: options.muted,
@@ -249,7 +249,7 @@ export class JanusClient {
       try {
         // 1. 创建房间请求
         const createResponse = await axios.post(
-          `${this.baseUrl}/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+          `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
           {
             janus: "message",
             body: {

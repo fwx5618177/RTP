@@ -40,6 +40,11 @@ class JanusGateway
             // 添加 API Secret
             $data['apisecret'] = $this->apiSecret;
 
+            // 如果没有 transaction，添加一个
+            if (!isset($data['transaction'])) {
+                $data['transaction'] = $this->generateTransactionId();
+            }
+
             // 确保 endpoint 以 / 开头
             $endpoint = ltrim($endpoint, '/');
             $url = $endpoint ? "{$this->baseUrl}/{$endpoint}" : $this->baseUrl;
@@ -50,7 +55,10 @@ class JanusGateway
             ]);
 
             $response = $this->client->post($url, [
-                'json' => $data
+                'json' => $data,
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                ],
             ]);
 
             $result = json_decode($response->getBody()->getContents(), true);
@@ -61,12 +69,12 @@ class JanusGateway
 
             return $result;
         } catch (GuzzleException $e) {
-            $this->logger->error("Janus request failed", [
+            $this->logger->error("Failed to communicate with Janus", [
                 'error' => $e->getMessage(),
                 'endpoint' => $endpoint,
                 'data' => $data
             ]);
-            throw new \Exception('Failed to communicate with Janus: ' . $e->getMessage());
+            throw new GatewayException("Failed to communicate with Janus: " . $e->getMessage());
         }
     }
 
