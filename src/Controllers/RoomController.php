@@ -12,6 +12,7 @@ use App\Http\Response;
 use App\Logs\Logger;
 use App\Services\RoomService;
 use Psr\Container\ContainerInterface;
+use App\Gateway\JanusGateway;
 
 class RoomController extends BaseController
 {
@@ -19,6 +20,7 @@ class RoomController extends BaseController
     private Logger $logger;
     private string $janusWsUrl;
     private Config $config;
+    private JanusGateway $janusGateway;
 
     public function __construct(ContainerInterface $container)
     {
@@ -27,6 +29,7 @@ class RoomController extends BaseController
         $this->logger = Logger::getInstance('room-controller');
         $this->config = Config::getInstance();
         $this->janusWsUrl = $this->config->get('JANUS_WS_ENDPOINT', 'ws://127.0.0.1:8188');
+        $this->janusGateway = $container->get(JanusGateway::class);
     }
 
     public function createRoom(Request $request): Response
@@ -387,34 +390,46 @@ class RoomController extends BaseController
         try {
             $room = $this->roomService->findRoom($roomId);
 
-            if (! $room) {
+            if (!$room) {
                 $this->logger->warning('Room participants not found, room id not found', ['roomId' => $roomId]);
-
-                return $this->errorResponse('Room participants not found, room id not found', 404);
+                return $this->errorResponse('Room not found', 404);
             }
 
-            $participants = $this->roomService->getRoomParticipants($roomId);
+            // 从 Janus 获取实时参与者列表
+            try {
+                $janusResponse = $this->janusGateway->listParticipants(
+                    $room->getJanusSessionId(),
+                    $room->getJanusHandleId(),
+                    $roomId
+                );
 
-            return $this->successResponse([
-                'roomId' => $roomId,
-                'count' => count($participants),
-                'participants' => array_map(function ($participant) {
-                    return [
-                        'userId' => $participant['userId'],
-                        'display' => $participant['display'],
-                        'joinedAt' => $participant['joinedAt'],
-                        'audioMuted' => $participant['audioMuted'] ?? false,
-                        'isActive' => $participant['isActive'] ?? true,
-                    ];
-                }, $participants),
-            ], 200);
+                $participants = [];
+                if (isset($janusResponse['plugindata']['data']['participants'])) {
+                    $participants = array_map(function ($p) {
+                        return [
+                            'userId' => $p['id'],
+                            'display' => $p['display'],
+                            'setup' => true,
+                            'audioMuted' => $p['muted'] ?? false,
+                            'joinedAt' => $p['joined_at'] ?? time() * 1000
+                        ];
+                    }, $janusResponse['plugindata']['data']['participants']);
+                }
+
+                return $this->successResponse([
+                    'roomId' => $roomId,
+                    'count' => count($participants),
+                    'participants' => $participants
+                ]);
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to get participants from Janus', [
+                    'error' => $e->getMessage(),
+                    'roomId' => $roomId
+                ]);
+                throw $e;
+            }
         } catch (\Exception $e) {
-            $this->logger->error('Failed to get room participants', [
-                'error' => $e->getMessage(),
-                'roomId' => $roomId,
-            ]);
-
-            return $this->errorResponse('Failed to get room participants', 500);
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 }

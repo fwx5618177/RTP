@@ -1,5 +1,5 @@
 import axios from "axios";
-import { ApiResponse, Room, Participant } from "../types/api";
+import { ApiResponse, Room, ParticipantListResponse } from "../types/api";
 
 const api = axios.create({
   baseURL: "/api",
@@ -49,7 +49,9 @@ export const roomApi = {
     api.post<ApiResponse>("/rooms/leave", data),
 
   getParticipants: (roomId: string) =>
-    api.get<ApiResponse<Participant[]>>(`/rooms/${roomId}/participants`),
+    api.get<ApiResponse<ParticipantListResponse>>(
+      `/rooms/${roomId}/participants`
+    ),
 
   configure: (
     roomId: string,

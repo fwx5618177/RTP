@@ -21,7 +21,7 @@ import {
 } from "@mui/icons-material";
 import { JanusClient } from "@/services/JanusClient";
 import { roomApi } from "@/services/api";
-import { Room as RoomType, Participant } from "@/types/api";
+import { Room as RoomType, ParticipantListResponse } from "@/types/api";
 import AudioMeter from "@/components/AudioMeter";
 import ParticipantList from "@/components/ParticipantList";
 import LoadingState from "@/components/LoadingState";
@@ -34,7 +34,8 @@ export default function Room() {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [room, setRoom] = useState<RoomType | null>(null);
-  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [participants, setParticipants] =
+    useState<ParticipantListResponse | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
   const [volume, setVolume] = useState(100);
@@ -342,7 +343,6 @@ export default function Room() {
               <AudioMeter
                 stream={audioStream}
                 onVolumeChange={(level) => {
-                  // 可以添加音量可视化效果
                   console.log("Current volume level:", level);
                 }}
               />
@@ -351,7 +351,7 @@ export default function Room() {
 
           {/* Participants List with improved styling */}
           <ParticipantList
-            participants={participants}
+            participants={participants!}
             currentUserId={room?.creator}
           />
         </Paper>

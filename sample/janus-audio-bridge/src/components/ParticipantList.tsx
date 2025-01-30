@@ -10,10 +10,10 @@ import {
   Box,
 } from "@mui/material";
 import { Mic, MicOff, Person } from "@mui/icons-material";
-import { Participant } from "../types/api";
+import { ParticipantListResponse } from "../types/api";
 
 interface ParticipantListProps {
-  participants: Participant[];
+  participants: ParticipantListResponse;
   currentUserId?: string;
 }
 
@@ -24,10 +24,10 @@ export default function ParticipantList({
   return (
     <Paper elevation={2} sx={{ mt: 2, p: 2 }}>
       <Typography variant="h6" gutterBottom>
-        Participants ({participants.length})
+        Participants ({participants.count})
       </Typography>
       <List>
-        {participants?.map((participant) => (
+        {participants?.participants?.map((participant) => (
           <ListItem
             key={participant.userId}
             sx={{

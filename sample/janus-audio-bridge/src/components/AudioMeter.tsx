@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { Box, Slider } from "@mui/material";
 
 interface AudioMeterProps {
   stream: MediaStream | null;

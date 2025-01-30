@@ -22,7 +22,13 @@ export interface Participant {
   display: string;
   joinedAt: string;
   audioMuted: boolean;
-  isPublisher?: boolean;
+  setup: boolean;
+}
+
+export interface ParticipantListResponse {
+  participants: Participant[];
+  count: number;
+  roomId: number;
 }
 
 export interface CreateRoomRequest {

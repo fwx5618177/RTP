@@ -91,7 +91,7 @@ class JanusController extends BaseController
     {
         try {
             $bodyParams = $request->getBodyParams();
-            $roomId = (int)($bodyParams['roomId'] ?? 0); // 确保转换为整数
+            $roomId = (int)($bodyParams['roomId'] ?? 0);
             $display = $bodyParams['display'] ?? 'anonymous';
 
             if ($roomId <= 0) {
@@ -112,22 +112,22 @@ class JanusController extends BaseController
                     'roomId' => $roomId,
                     'description' => "Room $roomId",
                     'sampling_rate' => 16000,
-                    'spatial_audio' => false
+                    'spatial_audio' => false,
+                    'display' => $display
                 ]);
             } catch (\App\Exceptions\GatewayException $e) {
                 // 如果房间已存在则忽略错误
                 if (!str_contains($e->getMessage(), 'already exists')) {
                     throw $e;
                 }
+                // 如果房间已存在，则直接加入
+                $result = $this->janusGateway->joinRoom($sessionId, $handleId, $roomId, $display);
             }
-
-            // 加入房间
-            $result = $this->janusGateway->joinRoom($sessionId, $handleId, $roomId, $display);
 
             return $this->successResponse([
                 'sessionId' => $sessionId,
                 'handleId' => $handleId,
-                'result' => $result
+                'result' => $result ?? null
             ], 200);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);

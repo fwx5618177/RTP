@@ -153,7 +153,8 @@ class JanusGateway
             throw new GatewayException('Room ID must be a positive integer');
         }
 
-        return $this->sendRequest("$sessionId/$handleId", [
+        // 1. 首先创建房间
+        $createResponse = $this->sendRequest("$sessionId/$handleId", [
             'janus' => 'message',
             'body' => [
                 'request' => 'create',
@@ -166,6 +167,20 @@ class JanusGateway
             ],
             'transaction' => $this->generateTransactionId()
         ]);
+
+        // 2. 如果房间创建成功，创建者自动加入房间
+        if (isset($createResponse['plugindata']['data']['room'])) {
+            $display = $config['display'] ?? 'Creator';
+            $joinResponse = $this->joinRoom($sessionId, $handleId, (int)$config['roomId'], $display);
+
+            // 合并创建和加入的响应
+            return [
+                'created' => $createResponse,
+                'joined' => $joinResponse
+            ];
+        }
+
+        return $createResponse;
     }
 
     /**
@@ -199,6 +214,21 @@ class JanusGateway
                 "room" => $roomId,
                 "display" => $display,
                 "muted" => false,
+            ],
+            "transaction" => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 获取房间参与者列表
+     */
+    public function listParticipants(string $sessionId, string $handleId, string $roomId): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            "janus" => "message",
+            "body" => [
+                "request" => "listparticipants",
+                "room" => (int)$roomId
             ],
             "transaction" => $this->generateTransactionId()
         ]);
