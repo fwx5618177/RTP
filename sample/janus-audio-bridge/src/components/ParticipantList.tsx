@@ -27,7 +27,7 @@ export default function ParticipantList({
         Participants ({participants.length})
       </Typography>
       <List>
-        {participants.map((participant) => (
+        {participants?.map((participant) => (
           <ListItem
             key={participant.userId}
             sx={{

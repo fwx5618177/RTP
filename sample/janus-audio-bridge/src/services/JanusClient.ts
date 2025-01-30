@@ -12,6 +12,8 @@ export class JanusClient {
   private config: JanusConfig;
   private onStateChange?: (state: { isMuted: boolean }) => void;
   private connected: boolean = false;
+  private participants: Map<string, any> = new Map();
+  private onParticipantsChange?: (participants: any[]) => void;
 
   constructor(config: JanusConfig) {
     this.config = config;
@@ -99,71 +101,42 @@ export class JanusClient {
 
   // 加入房间
   public async joinRoom(roomId: string, display: string): Promise<void> {
-    return this.retryOperation(async () => {
-      try {
-        // 1. 发送加入房间请求
-        const joinResponse = await axios.post(
-          `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
-          {
-            janus: "message",
-            transaction: this.generateTransactionId(),
-            body: {
-              request: "join",
-              room: parseInt(roomId),
-              display: display,
-              muted: false,
-            },
-          }
-        );
+    // 如果已经连接，直接返回
+    if (this.connected) {
+      console.log("Already connected to room:", roomId);
+      return;
+    }
 
-        console.log("Join room response:", joinResponse);
-
-        // 2. 创建并发送 Offer
-        const offer = await this.peerConnection!.createOffer({
-          offerToReceiveAudio: true,
-        });
-        await this.peerConnection!.setLocalDescription(offer);
-
-        // 3. 发送 Offer 到 Janus
-        const offerResponse = await axios.post(
-          `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
-          {
-            janus: "message",
-            transaction: this.generateTransactionId(),
-            body: {
-              request: "configure",
-              room: parseInt(roomId),
-              audio: true,
-              video: false,
-            },
-            jsep: offer,
-          }
-        );
-
-        console.log("Offer response:", offerResponse);
-
-        // 4. 处理 Janus 的 Answer
-        if (offerResponse.data.jsep) {
-          await this.peerConnection!.setRemoteDescription(
-            new RTCSessionDescription(offerResponse.data.jsep)
-          );
-          this.connected = true;
-        } else {
-          throw new Error("No JSEP in response");
+    try {
+      // 1. 发送加入房间请求
+      const joinResponse = await axios.post(
+        `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+        {
+          janus: "message",
+          transaction: this.generateTransactionId(),
+          body: {
+            request: "join",
+            room: parseInt(roomId),
+            display: display,
+            muted: false,
+          },
         }
+      );
 
-        // 5. 获取并处理房间状态信息
-        if (offerResponse.data.plugindata?.data?.participants) {
-          console.log(
-            "Current participants:",
-            offerResponse.data.plugindata.data.participants
-          );
-        }
-      } catch (error) {
-        console.error("Failed to join room:", error);
-        throw error;
+      if (joinResponse.data.success) {
+        this.connected = true;
+        console.log("Successfully joined room:", roomId);
+
+        // 其他初始化代码保持不变...
+        await this.initializeWebRTC();
+        return;
       }
-    });
+
+      throw new Error("Failed to join room: Invalid response");
+    } catch (error) {
+      console.error("Error joining room:", error);
+      throw error;
+    }
   }
 
   private async sendTrickle(candidate: RTCIceCandidate | null) {
@@ -236,15 +209,18 @@ export class JanusClient {
   }
 
   public disconnect(): void {
-    if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => track.stop());
-    }
     if (this.peerConnection) {
       this.peerConnection.close();
+      this.peerConnection = null;
     }
-    this.peerConnection = null;
-    this.localStream = null;
+
+    if (this.localStream) {
+      this.localStream.getTracks().forEach((track) => track.stop());
+      this.localStream = null;
+    }
+
     this.connected = false;
+    this.participants.clear();
   }
 
   public getLocalStream(): MediaStream | null {
@@ -252,38 +228,108 @@ export class JanusClient {
   }
 
   public async createRoom(roomId: string, display: string): Promise<void> {
-    return this.retryOperation(async () => {
-      try {
-        // 1. 创建房间请求
-        const createResponse = await axios.post(
-          `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
-          {
-            janus: "message",
-            transaction: this.generateTransactionId(),
-            body: {
-              request: "create",
-              room: parseInt(roomId), // 确保转换为数字
-              description: `Room created by ${display}`,
-              sampling_rate: 16000,
-              spatial_audio: false,
-              record: false,
-              permanent: false,
-            },
-          }
-        );
+    // 如果已经连接，直接返回
+    if (this.connected) {
+      console.log("Already connected to room:", roomId);
+      return;
+    }
 
-        if (createResponse.data.error) {
-          throw new Error(
-            `Failed to create room: ${createResponse.data.error}`
-          );
+    try {
+      // 1. 创建房间请求
+      const createResponse = await axios.post(
+        `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+        {
+          janus: "message",
+          transaction: this.generateTransactionId(),
+          body: {
+            request: "create",
+            room: parseInt(roomId),
+            description: `Room ${roomId}`,
+            sampling_rate: 16000,
+            spatial_audio: false,
+          },
         }
+      );
 
-        // 2. 创建成功后，作为创建者加入房间
-        await this.joinRoom(roomId, display);
-      } catch (error) {
-        console.error("Failed to create room:", error);
-        throw error;
+      // 检查响应状态
+      if (createResponse.data.success) {
+        this.connected = true;
+        console.log("Room created successfully:", roomId);
+
+        // 更新参与者列表
+        this.updateParticipants([
+          {
+            id: this.config.handleId,
+            display: display,
+            setup: true,
+            muted: false,
+          },
+        ]);
+
+        return;
       }
+
+      throw new Error("Failed to create room: Invalid response");
+    } catch (error) {
+      // 如果是房间已存在的错误，不需要抛出异常
+      if (error instanceof Error && error.message.includes("already exists")) {
+        this.connected = true;
+        console.log("Room already exists:", roomId);
+        return;
+      }
+      throw error;
+    }
+  }
+
+  public setParticipantsChangeHandler(handler: (participants: any[]) => void) {
+    this.onParticipantsChange = handler;
+  }
+
+  private updateParticipants(participantsList: any[]) {
+    participantsList.forEach((participant) => {
+      this.participants.set(participant.id, participant);
     });
+
+    if (this.onParticipantsChange) {
+      this.onParticipantsChange(Array.from(this.participants.values()));
+    }
+  }
+
+  private async initializeWebRTC(): Promise<void> {
+    if (!this.peerConnection) {
+      throw new Error("PeerConnection not initialized");
+    }
+
+    try {
+      // 创建并发送 Offer
+      const offer = await this.peerConnection.createOffer({
+        offerToReceiveAudio: true,
+      });
+      await this.peerConnection.setLocalDescription(offer);
+
+      // 发送 Offer 到 Janus
+      const offerResponse = await axios.post(
+        `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+        {
+          janus: "message",
+          transaction: this.generateTransactionId(),
+          body: {
+            request: "configure",
+            audio: true,
+            video: false,
+          },
+          jsep: offer,
+        }
+      );
+
+      if (offerResponse.data.jsep) {
+        await this.peerConnection.setRemoteDescription(
+          new RTCSessionDescription(offerResponse.data.jsep)
+        );
+      }
+    } catch (error) {
+      console.error("Failed to initialize WebRTC:", error);
+      throw error;
+    }
   }
 }
