@@ -166,19 +166,26 @@ export class JanusClient {
     });
   }
 
-  private async sendTrickle(candidate: RTCIceCandidate) {
-    try {
-      await axios.post(
-        `/api/janus/${this.config.sessionId}/${this.config.handleId}/trickle`,
-        {
-          janus: "trickle",
-          transaction: this.generateTransactionId(),
-          candidate: candidate,
-        }
-      );
-    } catch (error) {
-      console.error("Failed to send trickle:", error);
+  private async sendTrickle(candidate: RTCIceCandidate | null) {
+    if (!this.config.sessionId || !this.config.handleId) {
+      throw new Error("No session or handle");
     }
+
+    // 移除 /trickle
+    await axios.post(
+      `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
+      {
+        janus: "trickle",
+        transaction: this.generateTransactionId(),
+        candidate: candidate
+          ? {
+              candidate: candidate.candidate,
+              sdpMid: candidate.sdpMid,
+              sdpMLineIndex: candidate.sdpMLineIndex,
+            }
+          : null,
+      }
+    );
   }
 
   public async configure(options: {
@@ -252,12 +259,15 @@ export class JanusClient {
           `/api/janus/${this.config.sessionId}/${this.config.handleId}`,
           {
             janus: "message",
+            transaction: this.generateTransactionId(),
             body: {
               request: "create",
-              room: parseInt(roomId),
+              room: parseInt(roomId), // 确保转换为数字
               description: `Room created by ${display}`,
               sampling_rate: 16000,
               spatial_audio: false,
+              record: false,
+              permanent: false,
             },
           }
         );

@@ -27,7 +27,13 @@ class JanusGateway
 
         $this->client = new Client([
             'base_uri' => $this->baseUrl,
-            'timeout' => 5.0,
+            'timeout' => 10.0,
+            'connect_timeout' => 5.0,
+            'http_errors' => false,
+            'verify' => false,
+            'headers' => [
+                'Content-Type' => 'application/json',
+            ],
         ]);
     }
 
@@ -54,30 +60,66 @@ class JanusGateway
                 'data' => $data
             ]);
 
-            $response = $this->client->post($url, [
+            // 对于 trickle 请求使用较短的超时时间
+            $options = [
                 'json' => $data,
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                ],
-            ]);
+            ];
 
-            $result = json_decode($response->getBody()->getContents(), true);
+            if (str_contains($endpoint, '/trickle')) {
+                $options['timeout'] = 2.0; // trickle 请求使用更短的超时时间
+            }
 
-            if (!$result) {
+            $response = $this->client->post($url, $options);
+
+            // 检查状态码
+            $statusCode = $response->getStatusCode();
+            if ($statusCode !== 200) {
+                throw new GatewayException("Janus returned non-200 status code: $statusCode");
+            }
+
+            $contents = $response->getBody()->getContents();
+
+            // 特殊处理 trickle 请求
+            if (str_contains($endpoint, '/trickle')) {
+                // 如果是空响应或者响应体很小，都认为是正常的
+                if (empty($contents) || strlen($contents) < 5) {
+                    return [
+                        'janus' => 'ack',
+                        'transaction' => $data['transaction']
+                    ];
+                }
+            }
+
+            $result = json_decode($contents, true);
+
+            if (!$result && !str_contains($endpoint, '/trickle')) {
                 throw new \Exception('Invalid response from Janus server');
             }
 
-            return $result;
+            return $result ?: [];
         } catch (GuzzleException $e) {
             $this->logger->error("Failed to communicate with Janus", [
                 'error' => $e->getMessage(),
                 'endpoint' => $endpoint,
                 'data' => $data
             ]);
+
+            // 对于 trickle 请求的特殊处理
+            if (str_contains($endpoint, '/trickle')) {
+                if (
+                    str_contains($e->getMessage(), 'Empty reply from server') ||
+                    str_contains($e->getMessage(), 'Operation timed out')
+                ) {
+                    return [
+                        'janus' => 'ack',
+                        'transaction' => $data['transaction']
+                    ];
+                }
+            }
+
             throw new GatewayException("Failed to communicate with Janus: " . $e->getMessage());
         }
     }
-
     /**
      * 创建 Janus 会话
      */
@@ -107,15 +149,34 @@ class JanusGateway
      */
     public function createRoom(string $sessionId, string $handleId, array $config): array
     {
+        if (empty($config['roomId']) || !is_numeric($config['roomId'])) {
+            throw new GatewayException('Room ID must be a positive integer');
+        }
+
         return $this->sendRequest("$sessionId/$handleId", [
             'janus' => 'message',
             'body' => [
                 'request' => 'create',
-                'room' => $config['roomId'],
+                'room' => (int)$config['roomId'],
                 'description' => $config['description'] ?? '',
                 'sampling_rate' => $config['sampling_rate'] ?? 16000,
                 'spatial_audio' => $config['spatial_audio'] ?? false,
+                'record' => false,
+                'permanent' => false
             ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 修复 trickle 请求路径
+     */
+    public function sendTrickle(string $sessionId, string $handleId, array $candidate): array
+    {
+        // 注意这里不要加 /trickle
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'trickle',
+            'candidate' => $candidate,
             'transaction' => $this->generateTransactionId()
         ]);
     }

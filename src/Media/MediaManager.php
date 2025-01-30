@@ -25,6 +25,7 @@ class MediaManager
     private JanusGateway $janusGateway;
     private ?string $sessionId = null;
     private ?string $handleId = null;
+    private ?int $currentRoomId = null;
 
     /**
      * 默认的音频编解码器配置
@@ -216,14 +217,14 @@ class MediaManager
             $this->handleId = (string)$handle['data']['id'];
 
             // 3. 创建音频房间
-            $roomId = rand(1000000, 9999999);
+            $roomId = rand(1000000, 9999999); // 生成一个随机的房间ID
             $roomConfig = [
-                "room" => $roomId,
-                "description" => $roomName,
-                "secret" => "room_" . $roomId,
-                "sampling_rate" => 16000,
-                "record" => false,
-                "notify_joining" => true,
+                'roomId' => $roomId,  // 修改这里，使用 roomId 作为键名
+                'description' => $roomName,
+                'sampling_rate' => 16000,
+                'spatial_audio' => false,
+                'record' => false,
+                'notify_joining' => true,
             ];
 
             $response = $this->janusGateway->createRoom(
@@ -232,12 +233,15 @@ class MediaManager
                 $roomConfig
             );
 
+            // 直接返回必要的信息
             return [
+                'sessionId' => $this->sessionId,
+                'handleId' => $this->handleId,
                 'roomId' => $roomId,
                 'janus_session_id' => $this->sessionId,
                 'janus_handle_id' => $this->handleId,
                 'config' => $roomConfig,
-                'janusResponse' => $response,
+                'janusResponse' => $response
             ];
         } catch (\Exception $e) {
             $this->logger->error('Failed to create audio room', [
@@ -252,6 +256,15 @@ class MediaManager
     public function joinAudioRoom(int $roomId, string $userId, string $display): array
     {
         try {
+            // 检查是否已经在房间中
+            if ($this->currentRoomId === $roomId) {
+                $this->logger->warning('Already in room', [
+                    'roomId' => $roomId,
+                    'userId' => $userId
+                ]);
+                throw new MediaException('Already in this room');
+            }
+
             if (! $this->sessionId) {
                 $session = $this->janusGateway->createSession();
                 $this->sessionId = (string)$session['data']['id'];
@@ -268,6 +281,9 @@ class MediaManager
                 $roomId,
                 $display
             );
+
+            // 保存当前房间ID
+            $this->currentRoomId = $roomId;
 
             return [
                 'roomId' => $roomId,
