@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import AudioMeter from "./AudioMeter";
 import { JanusClient } from "../services/JanusClient";
+import "../styles/room.css";
 
 interface RoomProps {
   roomId: string;
@@ -57,6 +58,7 @@ export const Room = ({
           autoGainControl: true,
         });
         console.log("Audio constraints applied successfully");
+        console.log("Audio stream:", audioStream);
       } catch (error) {
         console.error("Failed to apply audio constraints:", error);
       }
@@ -64,6 +66,18 @@ export const Room = ({
 
     if (audioStream) {
       initAudio();
+    }
+  }, [audioStream]);
+
+  useEffect(() => {
+    // 检查音频流数据
+    if (audioStream) {
+      console.log("Audio tracks:", audioStream.getAudioTracks());
+      audioStream.getAudioTracks().forEach((track) => {
+        console.log("Track enabled:", track.enabled);
+        console.log("Track muted:", track.muted);
+        console.log("Track readyState:", track.readyState);
+      });
     }
   }, [audioStream]);
 
