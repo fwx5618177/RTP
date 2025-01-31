@@ -11,6 +11,7 @@ import {
   Slider,
   IconButton,
   Tooltip,
+  Button,
 } from "@mui/material";
 import {
   Mic,
@@ -19,13 +20,14 @@ import {
   VolumeUp,
   VolumeOff,
 } from "@mui/icons-material";
-import { JanusClient } from "@/services/JanusClient";
-import { roomApi } from "@/services/api";
+import { JanusClient } from "../services/JanusClient";
+import { roomApi } from "../services/api";
 import { Room as RoomType, ParticipantListResponse } from "@/types/api";
 import AudioMeter from "@/components/AudioMeter";
 import ParticipantList from "@/components/ParticipantList";
 import LoadingState from "@/components/LoadingState";
 import ErrorState from "@/components/ErrorState";
+import { Room as RoomComponent } from "../components/Room";
 
 export default function Room() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -43,6 +45,45 @@ export default function Room() {
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [janusClient, setJanusClient] = useState<JanusClient | null>(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+
+  // 生成随机用户ID
+  const userId = useRef(Math.random().toString(36).substring(7));
+
+  useEffect(() => {
+    if (!roomId) {
+      console.error("No room ID provided");
+      navigate("/");
+      return;
+    }
+
+    const initializeAudio = async () => {
+      try {
+        console.log("Requesting audio permissions...");
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        console.log("Audio permissions granted, stream:", stream);
+        setAudioStream(stream);
+      } catch (err) {
+        console.error("Failed to get audio stream:", err);
+        setError("Failed to access microphone");
+      }
+    };
+
+    initializeAudio();
+
+    return () => {
+      if (audioStream) {
+        console.log("Cleaning up audio stream");
+        audioStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [roomId, navigate]);
 
   useEffect(() => {
     loadRoomDetails();
@@ -91,9 +132,8 @@ export default function Room() {
 
         await client.initializeMedia();
 
-        // 所有用户都是加入房间，因为房间已经在后端创建好了
-        const currentUser = localStorage.getItem("userId") || "anonymous";
-        await client.joinRoom(roomId!, currentUser);
+        // 修正 joinRoom 调用
+        await client.joinRoom(roomId!, `User-${userId.current}`); // 直接传入字符串参数
 
         const stream = client.getLocalStream();
         setAudioStream(stream);
@@ -180,6 +220,17 @@ export default function Room() {
     }
   };
 
+  const handleUnlockAudio = async () => {
+    if (janusClient) {
+      try {
+        await janusClient.tryUnlockAudio();
+        setAudioUnlocked(true);
+      } catch (error) {
+        console.error("Failed to unlock audio:", error);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <Container maxWidth="lg">
@@ -215,147 +266,27 @@ export default function Room() {
   }
 
   return (
-    <Container maxWidth="lg">
-      <Box
-        sx={{
-          minHeight: "100vh",
-          py: 4,
-          display: "flex",
-          flexDirection: "column",
-          gap: 3,
-        }}
-      >
-        <Paper
-          elevation={3}
-          sx={{
-            p: 3,
-            backgroundColor: "background.paper",
-            borderRadius: 2,
+    <div>
+      {error ? (
+        <div className="error">{error}</div>
+      ) : loading ? (
+        <div className="loading">Loading...</div>
+      ) : (
+        <RoomComponent
+          roomId={roomId!}
+          isCreator={room?.creator === localStorage.getItem("userId")}
+          currentUser={{
+            id: localStorage.getItem("userId") || "",
+            display: localStorage.getItem("display") || "",
           }}
-        >
-          {/* Room Header */}
-          <Grid container spacing={3} alignItems="center" sx={{ mb: 3 }}>
-            <Grid item xs={12} md={8}>
-              <Typography
-                variant="h4"
-                gutterBottom
-                sx={{
-                  fontWeight: 500,
-                  color: "primary.main",
-                }}
-              >
-                {room?.name || "Loading..."}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "text.secondary",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                }}
-              >
-                Room ID: {roomId}
-              </Typography>
-            </Grid>
-
-            {/* Audio Controls */}
-            <Grid item xs={12} md={4}>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                  justifyContent: { xs: "center", md: "flex-end" },
-                }}
-              >
-                <Tooltip title={isMuted ? "Unmute" : "Mute"}>
-                  <IconButton
-                    onClick={handleToggleMute}
-                    color={isMuted ? "error" : "primary"}
-                    sx={{
-                      "&:hover": {
-                        backgroundColor: isMuted
-                          ? "error.dark"
-                          : "primary.dark",
-                        opacity: 0.9,
-                      },
-                    }}
-                  >
-                    {isMuted ? <MicOff /> : <Mic />}
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title={isDeafened ? "Undeafen" : "Deafen"}>
-                  <IconButton
-                    onClick={handleToggleDeafen}
-                    color={isDeafened ? "error" : "primary"}
-                    sx={{
-                      "&:hover": {
-                        backgroundColor: isDeafened
-                          ? "error.dark"
-                          : "primary.dark",
-                        opacity: 0.9,
-                      },
-                    }}
-                  >
-                    {isDeafened ? <VolumeOff /> : <VolumeUp />}
-                  </IconButton>
-                </Tooltip>
-
-                <Box sx={{ width: 100 }}>
-                  <Slider
-                    value={volume}
-                    onChange={handleVolumeChange}
-                    disabled={isDeafened}
-                    aria-label="Volume"
-                    sx={{
-                      color: isDeafened ? "text.disabled" : "primary.main",
-                      "& .MuiSlider-thumb": {
-                        width: 12,
-                        height: 12,
-                      },
-                    }}
-                  />
-                </Box>
-
-                <Tooltip title="Leave Room">
-                  <IconButton
-                    onClick={() => navigate("/")}
-                    color="error"
-                    sx={{
-                      "&:hover": {
-                        backgroundColor: "error.dark",
-                        opacity: 0.9,
-                      },
-                    }}
-                  >
-                    <ExitToApp />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            </Grid>
-          </Grid>
-
-          {/* Audio Meter with visual feedback */}
-          {audioStream && (
-            <Box sx={{ mb: 3 }}>
-              <AudioMeter
-                stream={audioStream}
-                onVolumeChange={(level) => {
-                  console.log("Current volume level:", level);
-                }}
-              />
-            </Box>
-          )}
-
-          {/* Participants List with improved styling */}
-          <ParticipantList
-            participants={participants!}
-            currentUserId={room?.creator}
-          />
-        </Paper>
-      </Box>
-    </Container>
+          onLeave={() => navigate("/")}
+          audioStream={audioStream}
+          janusClient={janusClient}
+        />
+      )}
+      {!audioUnlocked && (
+        <Button onClick={handleUnlockAudio}>点击启用音频</Button>
+      )}
+    </div>
   );
 }

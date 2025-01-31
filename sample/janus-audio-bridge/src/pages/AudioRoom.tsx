@@ -26,6 +26,7 @@ export const AudioRoom = () => {
   });
 
   const [janusClient, setJanusClient] = useState<JanusClient | null>(null);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
 
   const handleCreateRoom = async (display: string) => {
     try {
@@ -57,6 +58,9 @@ export const AudioRoom = () => {
 
       // 4. 创建并加入房间
       await client.createRoom(roomData.roomId, display);
+
+      const stream = client.getLocalStream();
+      setAudioStream(stream);
 
       setJanusClient(client);
       setCurrentUser((prev) => ({ ...prev, display }));
@@ -95,6 +99,9 @@ export const AudioRoom = () => {
 
       // 4. 加入房间
       await client.joinRoom(roomId, display);
+
+      const stream = client.getLocalStream();
+      setAudioStream(stream);
 
       setJanusClient(client);
       setCurrentUser((prev) => ({ ...prev, display }));
@@ -149,6 +156,8 @@ export const AudioRoom = () => {
           isCreator={roomState.isCreator}
           currentUser={currentUser}
           onLeave={handleLeave}
+          audioStream={audioStream}
+          janusClient={janusClient}
         />
       )}
     </div>
