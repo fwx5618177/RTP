@@ -46,6 +46,8 @@ export default function Room() {
   const [loading, setLoading] = useState(true);
   const [janusClient, setJanusClient] = useState<JanusClient | null>(null);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+  const [currentDisplay, setCurrentDisplay] = useState<string | null>(null);
 
   // 生成随机用户ID
   const userId = useRef(Math.random().toString(36).substring(7));
@@ -133,7 +135,18 @@ export default function Room() {
         await client.initializeMedia();
 
         // 修正 joinRoom 调用
-        await client.joinRoom(roomId!, `User-${userId.current}`); // 直接传入字符串参数
+        await client.joinRoom(roomId!, `User-${userId.current}`);
+
+        // 设置 janusClient 状态
+        setJanusClient(client);
+
+        // 设置当前房间信息
+        setCurrentRoomId(roomId!);
+        setCurrentDisplay(`User-${userId.current}`);
+
+        // 确保 sessionId 和 handleId 被正确保存
+        localStorage.setItem("janusSessionId", roomData.janusSessionId);
+        localStorage.setItem("janusHandleId", roomData.janusHandleId);
 
         const stream = client.getLocalStream();
         setAudioStream(stream);

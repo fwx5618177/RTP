@@ -115,7 +115,7 @@ class RoomService extends BaseService
         }
     }
 
-    public function joinRoom(string $roomId, string $userId): array
+    public function joinRoom(string $roomId, string $userId, string $display): array
     {
         try {
             if (empty($roomId) || empty($userId)) {
@@ -136,7 +136,11 @@ class RoomService extends BaseService
                     'participants' => $this->redisService->sMembers("room:$roomId:participants"),
                 ];
             }
-            // 加入房间
+
+            // 加入房间到 Janus Gateway
+            $joinResponse = $this->mediaManager->joinAudioRoom((int)$roomId, $userId, $display);
+
+            // 保存用户到 Redis
             $this->redisService->sAdd("room:$roomId:participants", [$userId]);
 
             $this->logger->info('User joined room', [
@@ -148,6 +152,8 @@ class RoomService extends BaseService
                 'roomId' => $roomId,
                 'metadata' => $metadata,
                 'participants' => $this->redisService->sMembers("room:$roomId:participants"),
+                'sessionId' => $joinResponse['sessionId'],
+                'handleId' => $joinResponse['handleId'],
             ];
         } catch (\Exception $e) {
             $this->logger->error('Error in joinRoom', [
@@ -159,7 +165,6 @@ class RoomService extends BaseService
             throw $e;
         }
     }
-
     public function leaveRoom(string $roomId, string $userId): void
     {
         try {

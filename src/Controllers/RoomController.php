@@ -136,6 +136,7 @@ class RoomController extends BaseController
 
             $roomId = $data['roomId'];
             $userId = $data['userId'];
+            $display = $data['display'] ?? 'anonymous';
 
             // Check for SIP headers
             if ($request->getHeader('X-Conference-Room') && $request->getHeader('X-Conference-Server')) {
@@ -143,21 +144,15 @@ class RoomController extends BaseController
                 return $this->handleSipCall($request, $roomId, $userId);
             }
 
-            // 新增：获取房间信息，以获取 sessionId 和 handleId
-            $room = $this->roomService->findRoom($roomId);
-            if (!$room) {
-                return $this->errorResponse('Room not found', 404);
-            }
-
-            // 使用房间的 sessionId 和 handleId
-            $result = $this->roomService->joinRoom($roomId, $userId);
+            // 使用 RoomService 加入房间
+            $result = $this->roomService->joinRoom($roomId, $userId, $display);
 
             // 使用房间实体中的 sessionId 和 handleId
             $this->logger->info('User joined room', [
                 'roomId' => $roomId,
                 'userId' => $userId,
-                'sessionId' => $room->getJanusSessionId(),  // 使用房间实体的 sessionId
-                'handleId' => $room->getJanusHandleId(),    // 使用房间实体的 handleId
+                'sessionId' => $result['sessionId'],  // 使用结果中的 sessionId
+                'handleId' => $result['handleId'],    // 使用结果中的 handleId
                 "result" => $result
             ]);
 
@@ -165,8 +160,8 @@ class RoomController extends BaseController
                 'roomId' => $roomId,
                 'userId' => $userId,
                 'janus' => [
-                    'sessionId' => $room->getJanusSessionId(),  // 使用房间实体的 sessionId
-                    'handleId' => $room->getJanusHandleId(),    // 使用房间实体的 handleId
+                    'sessionId' => $result['sessionId'],  // 使用结果中的 sessionId
+                    'handleId' => $result['handleId'],    // 使用结果中的 handleId
                     'wsUrl' => $this->janusWsUrl,
                 ],
             ], 200);
@@ -186,7 +181,6 @@ class RoomController extends BaseController
                 ->setBody(['error' => $e->getMessage()]);
         }
     }
-
     public function leaveRoom(Request $request): Response
     {
         try {
@@ -254,7 +248,7 @@ class RoomController extends BaseController
 
             // 加入房间（使用特殊的 SIP 用户标识）
             $sipUserId = "sip:{$userId}@{$sipHeaders['X-Conference-Server']}";
-            $joinResult = $this->roomService->joinRoom($roomId, $sipUserId);
+            $joinResult = $this->roomService->joinRoom($roomId, $sipUserId, 'anonymous');
 
             // 记录 SIP 呼叫信息
             $this->logger->info('SIP call routed', [
