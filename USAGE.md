@@ -43,6 +43,7 @@ npm install -g pnpm
 ### 1. Start Backend Service / 启动后端服务
 
 ```bash
+composer install
 php src/index.php
 ```
 
