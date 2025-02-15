@@ -227,28 +227,33 @@ class RoomController extends BaseController
         try {
             // 获取 SIP 头信息
             $sipHeaders = [
+                'X-Room-Number' => $request->getHeader('X-Room-Number'),
+                'X-Janus-Room' => $request->getHeader('X-Janus-Room'),
+                'X-Source' => $request->getHeader('X-Source'),
                 'X-Conference-Room' => $request->getHeader('X-Conference-Room'),
                 'X-Conference-Server' => $request->getHeader('X-Conference-Server'),
             ];
 
             // 验证必要的 SIP 头
-            if (empty($sipHeaders['X-Conference-Room']) || empty($sipHeaders['X-Conference-Server'])) {
-                return (new Response())
-                    ->setStatusCode(400)
-                    ->setBody(['error' => 'Missing required SIP headers']);
+            if (empty($sipHeaders['X-Room-Number']) || empty($sipHeaders['X-Janus-Room'])) {
+                return $this->errorResponse('Missing required SIP headers', 400);
+            }
+
+            // 验证来源
+            if ($sipHeaders['X-Source'] !== 'asterisk') {
+                return $this->errorResponse('Invalid source', 403);
             }
 
             // 获取房间信息
             $room = $this->roomService->findRoom($roomId);
-            if (! $room) {
-                $this->logger->warning('Room not found, room id not found', ['roomId' => $roomId]);
-
-                return $this->errorResponse('Room not found, room id not found', 404);
+            if (!$room) {
+                $this->logger->warning('Room not found', ['roomId' => $roomId]);
+                return $this->errorResponse('Room not found', 404);
             }
 
             // 加入房间（使用特殊的 SIP 用户标识）
-            $sipUserId = "sip:{$userId}@{$sipHeaders['X-Conference-Server']}";
-            $joinResult = $this->roomService->joinRoom($roomId, $sipUserId, 'anonymous');
+            $sipUserId = "sip:{$userId}@rtp-bridge-asterisk";
+            $joinResult = $this->roomService->joinRoom($roomId, $sipUserId, "SIP User {$userId}");
 
             // 记录 SIP 呼叫信息
             $this->logger->info('SIP call routed', [
@@ -257,14 +262,12 @@ class RoomController extends BaseController
                 'headers' => $sipHeaders,
             ]);
 
-            return (new Response())
-                ->setStatusCode(200)
-                ->setBody([
-                    'message' => 'SIP call routed successfully',
-                    'roomId' => $roomId,
-                    'sipUserId' => $sipUserId,
-                    'joinResult' => $joinResult,
-                ]);
+            return $this->successResponse([
+                'message' => 'SIP call routed successfully',
+                'roomId' => $roomId,
+                'sipUserId' => $sipUserId,
+                'joinResult' => $joinResult,
+            ]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to handle SIP call', [
                 'error' => $e->getMessage(),
@@ -273,9 +276,7 @@ class RoomController extends BaseController
                 'userId' => $userId,
             ]);
 
-            return (new Response())
-                ->setStatusCode(500)
-                ->setBody(['error' => $e->getMessage()]);
+            return $this->errorResponse('Failed to handle SIP call: ' . $e->getMessage(), 500);
         }
     }
 
