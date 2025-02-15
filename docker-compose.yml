@@ -51,8 +51,31 @@ services:
       timeout: 10s
       retries: 3
 
+  # Asterisk PBX
+  asterisk:
+    image: andrius/asterisk:latest
+    container_name: rtp-bridge-asterisk
+    privileged: true
+    ports:
+      - "5060:5060/udp" # SIP
+      - "5060:5060/tcp" # SIP
+      - "10000-10100:10000-10100/udp" # RTP ports
+      - "8090:8088" # HTTP (AMI/ARI) - 将内部 8088 端口映射到外部 8090
+    volumes:
+      - ./dockers/config/asterisk:/etc/asterisk
+      - asterisk_sounds:/var/lib/asterisk/sounds
+      - asterisk_storage:/var/spool/asterisk
+    restart: always
+    healthcheck:
+      test: [ "CMD", "asterisk", "-rx", "core show version" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   db_data:
   redis_data:
+  asterisk_sounds:
+  asterisk_storage:
 
 
