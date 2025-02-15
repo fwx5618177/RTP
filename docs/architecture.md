@@ -216,3 +216,47 @@
 - C4 模型
 - 时序图
 - 数据流图
+
+```mermaid
+sequenceDiagram
+    participant UserA as User A (SIP)
+    participant Asterisk as Asterisk (PBX)
+    participant Janus as Janus Gateway
+    participant UserB as User B (WebRTC)
+
+    title SIP 呼叫转发到 Janus Gateway（含难点配置标注）
+
+    %% ------------------ 难点 1：Asterisk 路由配置 ------------------
+    Note over Asterisk: 难点 1：配置 Asterisk 路由规则
+    Note left of Asterisk: 1. 编辑 extensions.conf\n   exten => 1001,1,Dial(SIP/janus_ip:5060)\n2. 配置 sip.conf\n   [janus]\n   type=peer\n   host=janus_ip\n   port=5060
+
+    UserA->>Asterisk: 1. SIP INVITE (SDP Offer)
+    Asterisk->>Janus: 2. 转发 SIP INVITE (SDP Offer)
+
+    %% ------------------ 难点 2：Janus SIP 插件配置 ------------------
+    Note over Janus: 难点 2：配置 Janus SIP 插件
+    Note right of Janus: 编辑 janus.plugin.sip.cfg\n[sip]\nlisten=0.0.0.0:5060\nproxy=asterisk_ip:5060
+
+    Janus->>UserB: 3. WebSocket 通知新呼叫
+    UserB->>Janus: 4. WebRTC SDP Answer
+    Janus->>Asterisk: 5. SIP 200 OK (SDP Answer)
+    Asterisk->>UserA: 6. 转发 SIP 200 OK
+
+    %% ------------------ 难点 3：媒体编解码器协商 ------------------
+    Note over UserA, Janus: 难点 3：编解码器协商\n确保 Asterisk 和 Janus 支持相同编解码器（如 PCMU/Opus）
+    UserA->>Janus: 7. RTP 媒体流 (音频/视频)
+    Janus->>UserB: 8. 转发 RTP 媒体流
+    UserB->>Janus: 9. RTP 媒体流 (音频/视频)
+    Janus->>UserA: 10. 转发 RTP 媒体流
+
+    %% ------------------ 通话结束 ------------------
+    UserA->>Asterisk: 11. SIP BYE (挂断)
+    Asterisk->>Janus: 12. 转发 SIP BYE
+    Janus->>UserB: 13. WebSocket 通知挂断
+    UserB-->>Janus: 14. 确认释放资源
+    Janus-->>Asterisk: 15. SIP 200 OK
+    Asterisk-->>UserA: 16. SIP 200 OK
+
+    %% ------------------ 环境说明 ------------------
+    Note over UserA, UserB: 本地/局域网环境，无需 NAT 穿透。
+```
