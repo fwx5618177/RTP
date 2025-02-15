@@ -56,7 +56,7 @@ class Request
         }
     }
 
-    private function parseRequestBody(): array
+    public function parseRequestBody(): array
     {
         if ($this->method === self::METHOD_GET || $this->method === self::METHOD_HEAD) {
             return [];
@@ -157,7 +157,7 @@ class Request
         );
     }
 
-    public static function createFromSwoole(\Swoole\Http\Request $swooleRequest): self
+    public static function createFromSwoole($swooleRequest): self
     {
         $uri = $swooleRequest->server['request_uri'];
         $queryString = $swooleRequest->server['query_string'] ?? '';

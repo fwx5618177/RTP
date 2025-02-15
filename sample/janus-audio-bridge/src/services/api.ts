@@ -8,6 +8,19 @@ const api = axios.create({
   },
 });
 
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+
+interface CallParams {
+  extension: string;
+  roomId: string;
+}
+
+export const makeCall = async (params: CallParams) => {
+  const response = await axios.post(`${API_BASE_URL}/api/pbx/call`, params);
+  return response.data;
+};
+
 export const roomApi = {
   createRoom: (data: {
     userId: string;

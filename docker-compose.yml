@@ -15,7 +15,8 @@ services:
       - "7089:7089"
     volumes:
       - ./dockers/config/janus.jcfg:/usr/local/etc/janus/janus.jcfg
-      - ./dockers/config/janus.eventhandler.sampleevh.jcfg:/usr/local/etc/janus/janus.eventhandler.sampleevh.jcfg"
+      - ./dockers/config/janus.eventhandler.sampleevh.jcfg:/usr/local/etc/janus/janus.eventhandler.sampleevh.jcfg
+      - ./dockers/config/janus.plugin.sip.jcfg:/usr/local/etc/janus/janus.plugin.sip.jcfg
     restart: always
 
   # MySQL Database
