@@ -19,7 +19,7 @@ class Logger extends MonologLogger
         if (! isset(self::$instances[$name])) {
             $logger = new self($name);
             // 默认日志目录为项目根目录下的 logs 目录
-            $logFile = $logDir ? __DIR__.'/../../'.rtrim($logDir, '/').'/'.$name.'.log' : __DIR__.'/../../logs/'.$name.'.log';
+            $logFile = $logDir ? __DIR__ . '/../../' . rtrim($logDir, '/') . '/' . $name . '.log' : __DIR__ . '/../../logs/' . $name . '.log';
 
             // 文件日志handler
             $fileStream = new StreamHandler($logFile, $level);
@@ -102,7 +102,7 @@ class Logger extends MonologLogger
 
         $color = $colors[$level] ?? "\033[0m";
         $reset = "\033[0m";
-        $message = $color.$message.$reset;
+        $message = $color . $message . $reset;
         $this->log($level, $message, $context);
     }
 }

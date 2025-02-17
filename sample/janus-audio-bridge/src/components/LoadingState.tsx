@@ -1,12 +1,13 @@
+import React from "react";
 import { Box, CircularProgress, Typography } from "@mui/material";
 
 interface LoadingStateProps {
   message?: string;
 }
 
-export default function LoadingState({
+const LoadingState: React.FC<LoadingStateProps> = ({
   message = "Loading...",
-}: LoadingStateProps) {
+}) => {
   return (
     <Box
       sx={{
@@ -14,13 +15,16 @@ export default function LoadingState({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        minHeight: "200px",
+        p: 4,
+        gap: 2,
       }}
     >
-      <CircularProgress size={40} />
-      <Typography variant="body1" sx={{ mt: 2 }}>
+      <CircularProgress />
+      <Typography variant="body1" color="text.secondary">
         {message}
       </Typography>
     </Box>
   );
-}
+};
+
+export default LoadingState;

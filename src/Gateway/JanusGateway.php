@@ -18,6 +18,10 @@ class JanusGateway
     private string $apiSecret;
     private Client $client;
 
+    // 插件常量
+    public const PLUGIN_AUDIOBRIDGE = 'janus.plugin.audiobridge';
+    public const PLUGIN_SIP = 'janus.plugin.sip';
+
     public function __construct()
     {
         $this->logger = Logger::getInstance('janus-gateway');
@@ -97,29 +101,17 @@ class JanusGateway
             }
 
             return $result ?: [];
-        } catch (GuzzleException $e) {
+        } catch (\Exception $e) {
             $this->logger->error("Failed to communicate with Janus", [
                 'error' => $e->getMessage(),
                 'endpoint' => $endpoint,
                 'data' => $data
             ]);
 
-            // 对于 trickle 请求的特殊处理
-            if (str_contains($endpoint, '/trickle')) {
-                if (
-                    str_contains($e->getMessage(), 'Empty reply from server') ||
-                    str_contains($e->getMessage(), 'Operation timed out')
-                ) {
-                    return [
-                        'janus' => 'ack',
-                        'transaction' => $data['transaction']
-                    ];
-                }
-            }
-
             throw new GatewayException("Failed to communicate with Janus: " . $e->getMessage());
         }
     }
+
     /**
      * 创建 Janus 会话
      */
@@ -132,14 +124,13 @@ class JanusGateway
     }
 
     /**
-     * 附加到 AudioBridge 插件
+     * 附加到插件
      */
-    public function attachPlugin(string $sessionId): array
+    public function attachPlugin(string $sessionId, string $plugin = self::PLUGIN_AUDIOBRIDGE): array
     {
-        // 确保正确的路径格式
         return $this->sendRequest("$sessionId", [
             'janus' => 'attach',
-            'plugin' => 'janus.plugin.audiobridge',
+            'plugin' => $plugin,
             'transaction' => $this->generateTransactionId()
         ]);
     }
@@ -147,14 +138,13 @@ class JanusGateway
     /**
      * 创建音频房间
      */
-    public function createRoom(string $sessionId, string $handleId, array $config): array
+    public function createAudioRoom(string $sessionId, string $handleId, array $config): array
     {
         if (empty($config['roomId']) || !is_numeric($config['roomId'])) {
             throw new GatewayException('Room ID must be a positive integer');
         }
 
-        // 1. 首先创建房间
-        $createResponse = $this->sendRequest("$sessionId/$handleId", [
+        return $this->sendRequest("$sessionId/$handleId", [
             'janus' => 'message',
             'body' => [
                 'request' => 'create',
@@ -167,46 +157,13 @@ class JanusGateway
             ],
             'transaction' => $this->generateTransactionId()
         ]);
-
-        // 2. 如果房间创建成功，创建者自动加入房间
-        if (isset($createResponse['plugindata']['data']['room'])) {
-            $display = $config['display'] ?? 'Creator';
-            $joinResponse = $this->joinRoom($sessionId, $handleId, (int)$config['roomId'], $display);
-
-            // 合并创建和加入的响应
-            return [
-                'created' => $createResponse,
-                'joined' => $joinResponse
-            ];
-        }
-
-        return $createResponse;
     }
 
     /**
-     * 修复 trickle 请求路径
+     * 加入音频房间
      */
-    public function sendTrickle(string $sessionId, string $handleId, array $candidate): array
+    public function joinAudioRoom(string $sessionId, string $handleId, int $roomId, string $display): array
     {
-        // 注意这里不要加 /trickle
-        return $this->sendRequest("$sessionId/$handleId", [
-            'janus' => 'trickle',
-            'candidate' => $candidate,
-            'transaction' => $this->generateTransactionId()
-        ]);
-    }
-
-    /**
-     * 生成事务ID
-     */
-    private function generateTransactionId(): string
-    {
-        return bin2hex(random_bytes(16));
-    }
-
-    public function joinRoom(string $sessionId, string $handleId, int $roomId, string $display): array
-    {
-        // 修复 URL 构造
         return $this->sendRequest("$sessionId/$handleId", [
             "janus" => "message",
             "body" => [
@@ -216,6 +173,141 @@ class JanusGateway
                 "muted" => false,
             ],
             "transaction" => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 创建 SIP 会话并连接到音频房间
+     */
+    public function createSipBridgeSession(string $sessionId, string $handleId, array $config): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'bridge',
+                'room' => (int)$config['roomId'],
+                'sip' => [
+                    'uri' => $config['uri'],
+                    'call_id' => $config['call_id'] ?? uniqid('call_'),
+                    'headers' => $config['headers'] ?? [],
+                    'srtp' => 'sdes_optional'
+                ],
+                'muted' => $config['muted'] ?? false,
+                'quality' => $config['quality'] ?? 4,
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 更新 SIP 桥接会话
+     */
+    public function updateSipBridge(string $sessionId, string $handleId, array $config): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'update_bridge',
+                'muted' => $config['muted'] ?? false,
+                'quality' => $config['quality'] ?? 4,
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 断开 SIP 桥接会话
+     */
+    public function disconnectSipBridge(string $sessionId, string $handleId): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'disconnect'
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 注册 SIP 账号
+     */
+    public function registerSip(string $sessionId, string $handleId, array $config): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'register',
+                'username' => $config['username'],
+                'display_name' => $config['display_name'] ?? '',
+                'authuser' => $config['authuser'] ?? $config['username'],
+                'secret' => $config['secret'],
+                'proxy' => $config['proxy'],
+                'sips' => false,
+                'refresh' => true
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 发起 SIP 呼叫
+     */
+    public function makeCall(string $sessionId, string $handleId, array $config): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'call',
+                'uri' => $config['uri'],
+                'call_id' => $config['call_id'] ?? uniqid('call_'),
+                'headers' => $config['headers'] ?? [],
+                'srtp' => 'sdes_optional'
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 接受 SIP 呼叫
+     */
+    public function acceptCall(string $sessionId, string $handleId): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'accept'
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 挂断 SIP 呼叫
+     */
+    public function hangupCall(string $sessionId, string $handleId): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'hangup'
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 发送 DTMF
+     */
+    public function sendDtmf(string $sessionId, string $handleId, string $digit): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'dtmf_info',
+                'digit' => $digit
+            ],
+            'transaction' => $this->generateTransactionId()
         ]);
     }
 
@@ -231,6 +323,163 @@ class JanusGateway
                 "room" => (int)$roomId
             ],
             "transaction" => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 获取 SIP 插件状态
+     */
+    public function getSipPluginStatus(string $sessionId, string $handleId): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'status'
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 发送 SIP INFO 消息
+     */
+    public function sendSipInfo(string $sessionId, string $handleId, array $info): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'info',
+                'type' => $info['type'] ?? 'application/dtmf',
+                'content' => $info['content'] ?? '',
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 更新 SIP 呼叫媒体设置
+     */
+    public function updateCallMedia(string $sessionId, string $handleId, array $media): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'update',
+                'audio' => $media['audio'] ?? true,
+                'video' => $media['video'] ?? false,
+                'data' => $media['data'] ?? false,
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 获取 SIP 呼叫统计信息
+     */
+    public function getCallStats(string $sessionId, string $handleId): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'message',
+            'body' => [
+                'request' => 'callstats'
+            ],
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 处理 SIP 事件
+     */
+    public function handleSipEvent(array $event): array
+    {
+        $this->logger->debug('Handling SIP event', ['event' => $event]);
+
+        $result = [
+            'type' => $event['janus'] ?? 'unknown',
+            'session_id' => $event['session_id'] ?? null,
+            'handle_id' => $event['handle_id'] ?? null,
+            'status' => 'unknown'
+        ];
+
+        if (isset($event['plugindata']['data'])) {
+            $data = $event['plugindata']['data'];
+            $result['sip'] = [
+                'event' => $data['event'] ?? 'unknown',
+                'result' => $data['result'] ?? null,
+                'call_id' => $data['call-id'] ?? null,
+                'code' => $data['code'] ?? null,
+                'reason' => $data['reason'] ?? null
+            ];
+
+            // 处理特定的 SIP 事件
+            switch ($data['event'] ?? '') {
+                case 'registered':
+                    $result['status'] = 'registered';
+                    break;
+                case 'registration_failed':
+                    $result['status'] = 'registration_failed';
+                    break;
+                case 'incoming_call':
+                    $result['status'] = 'incoming';
+                    break;
+                case 'accepting':
+                    $result['status'] = 'accepting';
+                    break;
+                case 'progress':
+                    $result['status'] = 'progress';
+                    break;
+                case 'accepted':
+                    $result['status'] = 'connected';
+                    break;
+                case 'hangup':
+                    $result['status'] = 'hangup';
+                    break;
+                default:
+                    $result['status'] = 'unknown';
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * 生成事务ID
+     */
+    private function generateTransactionId(): string
+    {
+        return bin2hex(random_bytes(16));
+    }
+
+    /**
+     * 获取会话的所有句柄
+     */
+    public function listHandles(string $sessionId): array
+    {
+        return $this->sendRequest($sessionId, [
+            'janus' => 'list_handles',
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 获取句柄信息
+     */
+    public function handleInfo(string $sessionId, string $handleId): array
+    {
+        return $this->sendRequest("$sessionId/$handleId", [
+            'janus' => 'handle_info',
+            'transaction' => $this->generateTransactionId()
+        ]);
+    }
+
+    /**
+     * 销毁会话
+     */
+    public function destroySession(string $sessionId): array
+    {
+        return $this->sendRequest($sessionId, [
+            'janus' => 'destroy',
+            'transaction' => $this->generateTransactionId()
         ]);
     }
 }

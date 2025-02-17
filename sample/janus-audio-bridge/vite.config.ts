@@ -18,12 +18,16 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
-    port: 5173,
+    port: 3000,
     proxy: {
       "/api": {
-        target: "http://localhost:9501",
+        target: "http://localhost:8000",
         changeOrigin: true,
-        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+      "/ws": {
+        target: "ws://localhost:8000",
+        ws: true,
       },
     },
   },

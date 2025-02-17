@@ -1,53 +1,68 @@
+import { AxiosRequestConfig, AxiosResponse } from "axios";
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data: T;
-  code: number;
-  time: number;
+  message?: string;
 }
 
 export interface Room {
-  roomId: string;
+  id: string;
   name: string;
-  createdAt: string;
-  creator: string;
-  maxParticipants: number;
+  description?: string;
+  participants: number;
+  created_at: string;
   janusSessionId: string;
   janusHandleId: string;
-  wsUrl: string;
-  participantsCount: number;
+  roomId: string;
 }
 
 export interface Participant {
-  userId: string;
+  id: string;
   display: string;
-  joinedAt: string;
-  audioMuted: boolean;
-  setup: boolean;
+  muted: boolean;
+  talking: boolean;
+  joined_at: string;
 }
 
 export interface ParticipantListResponse {
   participants: Participant[];
-  count: number;
-  roomId: number;
+  total: number;
 }
 
-export interface CreateRoomRequest {
-  userId: string;
-  roomName: string;
-  config: {
-    maxParticipants: number;
-    audioEnabled: boolean;
-    videoEnabled: boolean;
-    audioConfig?: {
-      sampleRate: number;
-      channels: number;
-      codec: string;
-    };
-  };
+export interface SipCallResponse {
+  success: boolean;
+  callId?: string;
+  message?: string;
+  status?: string;
 }
 
-export interface JoinRoomRequest {
+export interface CallStatusResponse {
+  status: string;
+  duration?: number;
+  error?: string;
+}
+
+export interface ActiveChannel {
+  id: string;
+  extension: string;
   roomId: string;
-  userId: string;
-  display: string;
+  status: string;
+  startTime: string;
+}
+
+declare module "axios" {
+  export interface AxiosRequestConfig {
+    _retry?: boolean;
+  }
+}
+
+// 环境变量类型定义
+interface ImportMetaEnv {
+  readonly VITE_API_BASE_URL: string;
+  readonly VITE_WS_URL: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
 }

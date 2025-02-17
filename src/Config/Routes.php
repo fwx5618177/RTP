@@ -11,7 +11,7 @@ use App\Controllers\RoomController;
 use App\Controllers\UserController;
 use App\Controllers\WebSocketController;
 use App\Controllers\OptionsController;
-use App\Http\Response;
+use App\Controllers\PbxController;
 use App\Middlewares\CorsMiddleware;
 use App\Middlewares\TestConditionMiddleware;
 use App\Middlewares\TestFlowMiddleware;
@@ -85,12 +85,34 @@ return function (Router $router) {
         'prefix' => '/api/janus',
         'middleware' => [],
     ], function ($route) {
-        // OPTIONS 请求使用控制器处理
+        // 会话管理
+        $route->add('POST', '/session', [JanusController::class, 'createSession']);
+        $route->add('DELETE', '/session/{sessionId}', [JanusController::class, 'destroySession']);
+
+        // SIP 桥接
+        $route->add('POST', '/sip/bridge/{sessionId}', [JanusController::class, 'createSipBridge']);
+        $route->add('PATCH', '/sip/bridge/{sessionId}', [JanusController::class, 'updateSipBridge']);
+        $route->add('DELETE', '/sip/bridge/{sessionId}', [JanusController::class, 'disconnectSipBridge']);
+
+        // 房间管理
+        $route->add('POST', '/room/join', [JanusController::class, 'joinRoom']);
+
+        // WebRTC 信令
+        $route->add('POST', '/{sessionId}/{handleId}/message', [JanusController::class, 'handleMessage']);
+        $route->add('POST', '/{sessionId}/{handleId}/trickle', [JanusController::class, 'handleTrickle']);
+
+        // OPTIONS 请求处理
         $route->add('OPTIONS', '/{sessionId}/{handleId}', [OptionsController::class, 'handle']);
         $route->add('OPTIONS', '/{sessionId}/{handleId}/trickle', [OptionsController::class, 'handle']);
+    });
 
-        // 原有的路由
-        $route->add('POST', '/{sessionId}/{handleId}', [JanusController::class, 'handleMessage']);
-        $route->add('POST', '/{sessionId}/{handleId}/trickle', [JanusController::class, 'handleTrickle']);
+    // PBX 路由组
+    $router->group([
+        'prefix' => '/api/pbx',
+        'middleware' => [],
+    ], function ($route) {
+        $route->add('POST', '/call', [PbxController::class, 'makeCall']);
+        $route->add('GET', '/call/status/{extension}', [PbxController::class, 'getCallStatus']);
+        $route->add('GET', '/channels', [PbxController::class, 'getActiveChannels']);
     });
 };

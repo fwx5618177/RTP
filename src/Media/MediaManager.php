@@ -63,7 +63,7 @@ class MediaManager
             $sdpOffer = $this->createSdpOffer();
             $this->logger->debug('Created SDP offer', ['sdp' => $sdpOffer]);
             // 通过 Janus Gateway 发送 SIP INVITE
-            $sessionInfo = $this->janusGateway->createRoom($roomName, $userId, [$sdpOffer]);
+            $sessionInfo = $this->janusGateway->createAudioRoom($roomName, $userId, [$sdpOffer]);
             $this->logger->debug('Received session info', ['info' => json_encode($sessionInfo)]);
 
             // 解析 SDP Answer
@@ -227,7 +227,7 @@ class MediaManager
                 'notify_joining' => true,
             ];
 
-            $response = $this->janusGateway->createRoom(
+            $response = $this->janusGateway->createAudioRoom(
                 $this->sessionId,
                 $this->handleId,
                 $roomConfig
@@ -275,7 +275,7 @@ class MediaManager
                 $this->handleId = (string)$handle['data']['id'];
             }
 
-            $response = $this->janusGateway->joinRoom(
+            $response = $this->janusGateway->joinAudioRoom(
                 $this->sessionId,
                 $this->handleId,
                 $roomId,
@@ -299,5 +299,123 @@ class MediaManager
 
             throw new MediaException('Failed to join audio room: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * 处理 SIP 到 WebRTC 的媒体转换
+     */
+    public function handleSipToWebRtc(array $sipMedia, array $webrtcMedia): array
+    {
+        $this->logger->debug('Converting SIP to WebRTC media', [
+            'sip' => $sipMedia,
+            'webrtc' => $webrtcMedia
+        ]);
+
+        return [
+            'audio' => [
+                'codecs' => $this->getCompatibleAudioCodecs($sipMedia['audio']['codecs'] ?? [], $webrtcMedia['audio']['codecs'] ?? []),
+                'rtpmap' => $this->generateRtpMap($sipMedia['audio']['codecs'] ?? []),
+                'fmtp' => $this->generateFmtp($sipMedia['audio']['codecs'] ?? []),
+                'direction' => 'sendrecv'
+            ],
+            'video' => false,
+            'data' => false
+        ];
+    }
+
+    /**
+     * 处理 WebRTC 到 SIP 的媒体转换
+     */
+    public function handleWebRtcToSip(array $webrtcMedia, array $sipMedia): array
+    {
+        $this->logger->debug('Converting WebRTC to SIP media', [
+            'webrtc' => $webrtcMedia,
+            'sip' => $sipMedia
+        ]);
+
+        return [
+            'audio' => [
+                'codecs' => $this->getCompatibleAudioCodecs($webrtcMedia['audio']['codecs'] ?? [], $sipMedia['audio']['codecs'] ?? []),
+                'rtpmap' => $this->generateRtpMap($webrtcMedia['audio']['codecs'] ?? []),
+                'fmtp' => $this->generateFmtp($webrtcMedia['audio']['codecs'] ?? []),
+                'direction' => 'sendrecv'
+            ],
+            'video' => false,
+            'data' => false
+        ];
+    }
+
+    /**
+     * 获取兼容的音频编解码器
+     */
+    private function getCompatibleAudioCodecs(array $sourceCodecs, array $targetCodecs): array
+    {
+        $compatibleCodecs = [];
+        foreach ($sourceCodecs as $sourceCodec) {
+            foreach ($targetCodecs as $targetCodec) {
+                if ($this->isCodecCompatible($sourceCodec, $targetCodec)) {
+                    $compatibleCodecs[] = $sourceCodec;
+                    break;
+                }
+            }
+        }
+        return $compatibleCodecs;
+    }
+
+    /**
+     * 检查编解码器是否兼容
+     */
+    private function isCodecCompatible(array $codec1, array $codec2): bool
+    {
+        // 检查基本编解码器名称是否匹配
+        if (strtolower($codec1['name']) !== strtolower($codec2['name'])) {
+            return false;
+        }
+
+        // 检查采样率是否兼容
+        if ($codec1['clockrate'] !== $codec2['clockrate']) {
+            return false;
+        }
+
+        // 检查通道数是否兼容
+        if (
+            isset($codec1['channels']) && isset($codec2['channels']) &&
+            $codec1['channels'] !== $codec2['channels']
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * 生成 RTP Map
+     */
+    private function generateRtpMap(array $codecs): array
+    {
+        $rtpMap = [];
+        foreach ($codecs as $codec) {
+            $rtpMap[$codec['pt']] = sprintf(
+                '%s/%d%s',
+                $codec['name'],
+                $codec['clockrate'],
+                isset($codec['channels']) ? '/' . $codec['channels'] : ''
+            );
+        }
+        return $rtpMap;
+    }
+
+    /**
+     * 生成 FMTP
+     */
+    private function generateFmtp(array $codecs): array
+    {
+        $fmtp = [];
+        foreach ($codecs as $codec) {
+            if (isset($codec['fmtp'])) {
+                $fmtp[$codec['pt']] = $codec['fmtp'];
+            }
+        }
+        return $fmtp;
     }
 }
