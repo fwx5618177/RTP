@@ -312,3 +312,123 @@ pnpm preview
    - Enable logging rotation
    - Set up monitoring
    - Use load balancing if needed
+
+## Inbound SIP Call Flow
+
+### Overview
+
+The system handles inbound SIP calls through a sophisticated integration between Asterisk PBX and Janus WebRTC Gateway. Here's the detailed flow:
+
+1. **Call Reception**
+
+   - Inbound calls are received by Asterisk PBX
+   - Dial pattern: `9XXX` (e.g., 9123 connects to room 123)
+   - Example: Dialing 9456 will connect to WebRTC room 456
+
+2. **Call Processing in Asterisk**
+
+   ```
+   [default]
+   exten => _9XXX,1,NoOp(Forwarding to Janus WebRTC room ${EXTEN:1})
+   same => n,Set(ROOM_NUMBER=${EXTEN:1})
+   same => n,Set(CALLERID(name)=SIP-${CALLERID(num)})
+   same => n,Set(__SIPADDHEADER01=X-Room-Number: ${ROOM_NUMBER})
+   same => n,Set(__SIPADDHEADER02=X-Janus-Room: ${ROOM_NUMBER})
+   same => n,Dial(${JANUS_GATEWAY},30,b)
+   ```
+
+3. **Janus Integration**
+
+   - Calls are forwarded to Janus Gateway
+   - Room information is passed via SIP headers
+   - Janus creates RTP bridge for audio streaming
+   - WebRTC participants receive the audio stream
+
+4. **Media Handling**
+   - SIP audio: RTP/PCMA or PCMU
+   - WebRTC audio: Opus codec
+   - Automatic transcoding when needed
+   - Bidirectional audio support
+
+### Implementation Details
+
+1. **Backend Components**
+
+   - `JanusGateway`: Manages Janus WebRTC Gateway communication
+   - `MediaManager`: Handles SDP negotiation and media setup
+   - `AsteriskService`: Controls Asterisk through AMI
+   - `PbxController`: Exposes PBX control API endpoints
+
+2. **Frontend Components**
+
+   - `JanusClient`: WebRTC connection management
+   - `AudioRoom`: Room UI and participant management
+   - `SipCall`: SIP call control interface
+   - Real-time audio level monitoring
+
+3. **API Endpoints**
+
+   ```
+   POST /api/pbx/call          # Initiate SIP call
+   GET  /api/pbx/status/:ext   # Get call status
+   GET  /api/pbx/channels      # List active channels
+   ```
+
+4. **WebSocket Events**
+
+   - `room:joined`: Participant joined room
+   - `room:left`: Participant left room
+   - `call:connected`: SIP call connected
+   - `call:ended`: SIP call terminated
+
+5. **Configuration Files**
+
+   - `janus.plugin.sip.jcfg`: Janus SIP plugin config
+   - `sip.conf`: Asterisk SIP configuration
+   - `extensions.conf`: Asterisk dialplan
+
+6. **Security Measures**
+
+   - SIP authentication required
+   - WebRTC secure signaling
+   - Room access control
+   - Rate limiting on API endpoints
+
+7. **Monitoring and Logging**
+   - Call status tracking
+   - Media quality metrics
+   - Error logging and alerts
+   - Performance monitoring
+
+### Validation Steps
+
+1. **SIP Call Testing**
+
+   ```bash
+   # Test inbound call
+   sip-call -u 6001 -p password6001 -d 9123
+
+   # Monitor Asterisk
+   asterisk -rx 'sip show peers'
+   asterisk -rx 'core show channels'
+   ```
+
+2. **WebRTC Testing**
+
+   - Open web interface
+   - Create/join room 123
+   - Verify audio connection
+   - Check participant list
+
+3. **Integration Testing**
+
+   - Make SIP call to room
+   - Verify WebRTC participants receive audio
+   - Test bidirectional communication
+   - Monitor media quality
+
+4. **Performance Validation**
+   - Check CPU/memory usage
+   - Monitor network bandwidth
+   - Verify concurrent call handling
+   - Test reconnection scenarios
