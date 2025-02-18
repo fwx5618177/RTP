@@ -221,7 +221,7 @@ class JanusController extends BaseController
     {
         try {
             $body = $request->getBodyParams();
-            $response = $this->janusGateway->sendRequest("$sessionId/$handleId", $body);
+            $response = $this->janusGateway->sendRequest($sessionId, $handleId, $body);
 
             return new Response([
                 'success' => true,
@@ -254,7 +254,7 @@ class JanusController extends BaseController
                 throw new \Exception('Missing candidate in trickle request');
             }
 
-            $response = $this->janusGateway->sendRequest("$sessionId/$handleId/trickle", [
+            $response = $this->janusGateway->sendRequest($sessionId, $handleId, [
                 'janus' => 'trickle',
                 'transaction' => $body['transaction'],
                 'candidate' => $body['candidate']

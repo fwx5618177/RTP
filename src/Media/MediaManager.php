@@ -34,7 +34,12 @@ class MediaManager
         ['payload' => 0, 'name' => 'PCMU', 'rate' => 8000, 'channels' => 1],  // G.711 u-law
         ['payload' => 8, 'name' => 'PCMA', 'rate' => 8000, 'channels' => 1],  // G.711 a-law
         ['payload' => 101, 'name' => 'telephone-event', 'rate' => 8000, 'channels' => 1, 'fmtp' => '0-15'],  // DTMF
+        ['payload' => 111, 'name' => 'opus', 'rate' => 48000, 'channels' => 2, 'fmtp' => 'minptime=10;useinbandfec=1']  // Opus
     ];
+
+    private array $activeMediaSessions = [];
+    private array $rtpSockets = [];
+    private array $forwardingProcesses = [];
 
     public function __construct()
     {
@@ -417,5 +422,758 @@ class MediaManager
             }
         }
         return $fmtp;
+    }
+
+    /**
+     * 处理 SIP SDP Offer
+     */
+    public function handleSipSdpOffer(string $sdpOffer, string $callId): array
+    {
+        try {
+            $this->logger->info('Handling SIP SDP offer', [
+                'callId' => $callId
+            ]);
+
+            // 解析 SDP offer
+            $parser = new Parser();
+            $parsedOffer = $parser->parse($sdpOffer);
+
+            // 创建 SDP answer
+            $sdpAnswer = $this->createSdpAnswer($parsedOffer);
+
+            // 保存媒体会话信息
+            $mediaInfo = $this->extractMediaInfo($parsedOffer);
+            $this->activeMediaSessions[$callId] = [
+                'offer' => $sdpOffer,
+                'answer' => $sdpAnswer,
+                'mediaInfo' => $mediaInfo,
+                'status' => 'negotiating',
+                'created' => time()
+            ];
+
+            return [
+                'sdpAnswer' => $sdpAnswer,
+                'mediaInfo' => $mediaInfo
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to handle SIP SDP offer', [
+                'error' => $e->getMessage(),
+                'callId' => $callId
+            ]);
+            throw new MediaException('Failed to handle SIP SDP offer: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 处理 SIP SDP Answer
+     */
+    public function handleSipSdpAnswer(string $sdpAnswer, string $callId): array
+    {
+        try {
+            $this->logger->info('Handling SIP SDP answer', [
+                'callId' => $callId
+            ]);
+
+            if (!isset($this->activeMediaSessions[$callId])) {
+                throw new MediaException('No active media session found for call ID: ' . $callId);
+            }
+
+            // 解析 SDP answer
+            $parser = new Parser();
+            $parsedAnswer = $parser->parse($sdpAnswer);
+
+            // 更新媒体会话信息
+            $mediaInfo = $this->extractMediaInfo($parsedAnswer);
+            $this->activeMediaSessions[$callId]['answer'] = $sdpAnswer;
+            $this->activeMediaSessions[$callId]['mediaInfo'] = $mediaInfo;
+            $this->activeMediaSessions[$callId]['status'] = 'negotiated';
+
+            return [
+                'mediaInfo' => $mediaInfo
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to handle SIP SDP answer', [
+                'error' => $e->getMessage(),
+                'callId' => $callId
+            ]);
+            throw new MediaException('Failed to handle SIP SDP answer: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 开始 RTP 转发
+     */
+    public function startRtpForwarding(string $callId, string $targetIp, int $targetPort): array
+    {
+        try {
+            $this->logger->info('Starting RTP forwarding', [
+                'callId' => $callId,
+                'targetIp' => $targetIp,
+                'targetPort' => $targetPort
+            ]);
+
+            if (!isset($this->activeMediaSessions[$callId])) {
+                throw new MediaException('No active media session found for call ID: ' . $callId);
+            }
+
+            $session = $this->activeMediaSessions[$callId];
+            if ($session['status'] !== 'negotiated') {
+                throw new MediaException('Media session not in negotiated state');
+            }
+
+            // 配置 RTP 转发
+            $rtpConfig = [
+                'sourceIp' => $this->config->get('LOCAL_IP'),
+                'sourcePort' => $this->allocateRtpPort(),
+                'targetIp' => $targetIp,
+                'targetPort' => $targetPort,
+                'codec' => $session['mediaInfo']['audio']['codec'],
+                'ptime' => $session['mediaInfo']['audio']['ptime'],
+                'ssrc' => mt_rand(1, 999999),
+                'direction' => 'sendrecv'
+            ];
+
+            // 启动 RTP 转发
+            $this->startRtpStream($rtpConfig);
+
+            // 更新会话状态
+            $this->activeMediaSessions[$callId]['rtp'] = $rtpConfig;
+            $this->activeMediaSessions[$callId]['status'] = 'streaming';
+
+            return [
+                'rtpConfig' => $rtpConfig
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to start RTP forwarding', [
+                'error' => $e->getMessage(),
+                'callId' => $callId
+            ]);
+            throw new MediaException('Failed to start RTP forwarding: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 停止 RTP 转发
+     */
+    public function stopRtpForwarding(string $callId): array
+    {
+        try {
+            $this->logger->info('Stopping RTP forwarding', [
+                'callId' => $callId
+            ]);
+
+            if (!isset($this->activeMediaSessions[$callId])) {
+                throw new MediaException('No active media session found for call ID: ' . $callId);
+            }
+
+            $session = $this->activeMediaSessions[$callId];
+            if (!isset($session['rtp'])) {
+                throw new MediaException('No RTP configuration found for this session');
+            }
+
+            // 停止 RTP 转发
+            $this->stopRtpStream($session['rtp']);
+
+            // 更新会话状态
+            $this->activeMediaSessions[$callId]['status'] = 'stopped';
+            unset($this->activeMediaSessions[$callId]['rtp']);
+
+            return [
+                'status' => 'stopped',
+                'timestamp' => time()
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to stop RTP forwarding', [
+                'error' => $e->getMessage(),
+                'callId' => $callId
+            ]);
+            throw new MediaException('Failed to stop RTP forwarding: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 分配 RTP 端口
+     */
+    private function allocateRtpPort(): int
+    {
+        // 在可用端口范围内分配端口
+        $minPort = (int)$this->config->get('RTP_PORT_MIN', 10000);
+        $maxPort = (int)$this->config->get('RTP_PORT_MAX', 20000);
+
+        // 获取已使用的端口
+        $usedPorts = array_map(function ($session) {
+            return $session['rtp']['sourcePort'] ?? null;
+        }, $this->activeMediaSessions);
+        $usedPorts = array_filter($usedPorts);
+
+        // 查找可用端口
+        for ($port = $minPort; $port <= $maxPort; $port += 2) {
+            if (!in_array($port, $usedPorts)) {
+                return $port;
+            }
+        }
+
+        throw new MediaException('No available RTP ports');
+    }
+
+    /**
+     * 启动 RTP 流
+     */
+    private function startRtpStream(array $config): void
+    {
+        try {
+            $socketKey = sprintf('%s_%s', $config['callId'], $config['direction']);
+
+            // 创建子进程来处理 RTP 转发
+            $pid = pcntl_fork();
+
+            if ($pid == -1) {
+                throw new MediaException('Failed to create forwarding process');
+            } else if ($pid) {
+                // 父进程：记录子进程 PID
+                $this->forwardingProcesses[$socketKey] = [
+                    'pid' => $pid,
+                    'config' => $config,
+                    'start_time' => microtime(true)
+                ];
+                return;
+            }
+
+            // 子进程：处理 RTP 转发
+            try {
+                // 创建 UDP socket
+                $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+                if ($socket === false) {
+                    throw new MediaException('Failed to create socket: ' . socket_strerror(socket_last_error()));
+                }
+
+                // 设置 socket 选项
+                socket_set_option($socket, SOL_SOCKET, SO_REUSEADDR, 1);
+                socket_set_option($socket, SOL_SOCKET, SO_RCVBUF, 65535);
+                socket_set_option($socket, SOL_SOCKET, SO_SNDBUF, 65535);
+
+                // 绑定到源地址和端口
+                if (!socket_bind($socket, $config['sourceIp'], $config['sourcePort'])) {
+                    throw new MediaException('Failed to bind socket: ' . socket_strerror(socket_last_error($socket)));
+                }
+
+                // 设置非阻塞模式
+                socket_set_nonblock($socket);
+
+                $stats = [
+                    'packets_sent' => 0,
+                    'bytes_sent' => 0
+                ];
+
+                // 主转发循环
+                while (true) {
+                    $read = [$socket];
+                    $write = null;
+                    $except = null;
+
+                    // 使用 select 来等待数据，超时时间 10ms
+                    if (socket_select($read, $write, $except, 0, 10000) > 0) {
+                        $buffer = '';
+                        $from = '';
+                        $port = 0;
+
+                        // 接收 RTP 包
+                        $received = socket_recvfrom($socket, $buffer, 1500, 0, $from, $port);
+                        if ($received !== false) {
+                            // 转发 RTP 包
+                            $sent = socket_sendto(
+                                $socket,
+                                $buffer,
+                                strlen($buffer),
+                                0,
+                                $config['targetIp'],
+                                $config['targetPort']
+                            );
+
+                            if ($sent !== false) {
+                                $stats['packets_sent']++;
+                                $stats['bytes_sent'] += $sent;
+                            }
+                        }
+                    }
+
+                    // 定期记录统计信息
+                    if ($stats['packets_sent'] % 1000 == 0) {
+                        $this->logger->debug('RTP forwarding stats', [
+                            'socketKey' => $socketKey,
+                            'stats' => $stats
+                        ]);
+                    }
+
+                    // 检查父进程是否存活
+                    if (posix_getppid() == 1) {
+                        break; // 父进程已终止
+                    }
+                }
+
+                // 清理
+                socket_close($socket);
+                exit(0);
+            } catch (\Exception $e) {
+                $this->logger->error('RTP forwarding process error', [
+                    'error' => $e->getMessage(),
+                    'socketKey' => $socketKey
+                ]);
+                exit(1);
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to start RTP stream', [
+                'error' => $e->getMessage(),
+                'config' => $config
+            ]);
+            throw new MediaException('Failed to start RTP stream: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 停止 RTP 流
+     */
+    private function stopRtpStream(array $config): void
+    {
+        try {
+            $socketKey = sprintf('%s_%s', $config['callId'], $config['direction']);
+
+            if (isset($this->forwardingProcesses[$socketKey])) {
+                $process = $this->forwardingProcesses[$socketKey];
+
+                // 终止转发进程
+                posix_kill($process['pid'], SIGTERM);
+                pcntl_waitpid($process['pid'], $status);
+
+                // 记录统计信息
+                $this->logger->info('Stopped RTP stream', [
+                    'socketKey' => $socketKey,
+                    'duration' => microtime(true) - $process['start_time']
+                ]);
+
+                unset($this->forwardingProcesses[$socketKey]);
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to stop RTP stream', [
+                'error' => $e->getMessage(),
+                'config' => $config
+            ]);
+            throw new MediaException('Failed to stop RTP stream: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 获取 RTP 流统计信息
+     */
+    public function getRtpStats(string $callId, string $direction = null): array
+    {
+        $stats = [];
+        $pattern = $direction ? sprintf('%s_%s', $callId, $direction) : $callId . '_';
+
+        foreach ($this->forwardingProcesses as $key => $process) {
+            if (strpos($key, $pattern) === 0) {
+                $stats[$key] = [
+                    'pid' => $process['pid'],
+                    'running' => posix_kill($process['pid'], 0),
+                    'duration' => microtime(true) - $process['start_time']
+                ];
+            }
+        }
+
+        return $stats;
+    }
+
+    /**
+     * 配置 Asterisk 到 Janus 的 RTP 转发
+     */
+    public function setupAsteriskToJanusRtp(string $callId, array $asteriskRtpInfo, array $janusRtpInfo): array
+    {
+        try {
+            $this->logger->info('Setting up Asterisk to Janus RTP forwarding', [
+                'callId' => $callId,
+                'asterisk' => $asteriskRtpInfo,
+                'janus' => $janusRtpInfo
+            ]);
+
+            // 配置从 Asterisk 到 Janus 的 RTP 转发
+            $asteriskToJanusConfig = [
+                'callId' => $callId,
+                'sourceIp' => $asteriskRtpInfo['ip'],
+                'sourcePort' => $asteriskRtpInfo['port'],
+                'targetIp' => $janusRtpInfo['ip'],
+                'targetPort' => $janusRtpInfo['port'],
+                'direction' => 'asterisk_to_janus'
+            ];
+
+            // 配置从 Janus 到 Asterisk 的 RTP 转发
+            $janusToAsteriskConfig = [
+                'callId' => $callId,
+                'sourceIp' => $janusRtpInfo['ip'],
+                'sourcePort' => $janusRtpInfo['port'],
+                'targetIp' => $asteriskRtpInfo['ip'],
+                'targetPort' => $asteriskRtpInfo['port'],
+                'direction' => 'janus_to_asterisk'
+            ];
+
+            // 启动双向 RTP 转发
+            $this->startRtpStream($asteriskToJanusConfig);
+            $this->startRtpStream($janusToAsteriskConfig);
+
+            // 保存转发配置
+            $this->activeMediaSessions[$callId]['rtp_forwarding'] = [
+                'asterisk_to_janus' => $asteriskToJanusConfig,
+                'janus_to_asterisk' => $janusToAsteriskConfig
+            ];
+
+            return [
+                'status' => 'forwarding',
+                'asterisk_to_janus' => $asteriskToJanusConfig,
+                'janus_to_asterisk' => $janusToAsteriskConfig
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to setup RTP forwarding', [
+                'error' => $e->getMessage(),
+                'callId' => $callId
+            ]);
+            throw new MediaException('Failed to setup RTP forwarding: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 停止 Asterisk 到 Janus 的 RTP 转发
+     */
+    public function stopAsteriskToJanusRtp(string $callId): void
+    {
+        try {
+            if (isset($this->activeMediaSessions[$callId]['rtp_forwarding'])) {
+                $forwarding = $this->activeMediaSessions[$callId]['rtp_forwarding'];
+
+                // 停止双向 RTP 转发
+                $this->stopRtpStream($forwarding['asterisk_to_janus']);
+                $this->stopRtpStream($forwarding['janus_to_asterisk']);
+
+                unset($this->activeMediaSessions[$callId]['rtp_forwarding']);
+
+                $this->logger->info('Stopped RTP forwarding', [
+                    'callId' => $callId
+                ]);
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to stop RTP forwarding', [
+                'error' => $e->getMessage(),
+                'callId' => $callId
+            ]);
+            throw new MediaException('Failed to stop RTP forwarding: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 从 SDP 中提取媒体信息
+     */
+    private function extractMediaInfo($parsedSdp): array
+    {
+        $mediaInfo = [
+            'audio' => [
+                'codec' => '',
+                'ptime' => 20,
+                'rate' => 8000,
+                'channels' => 1
+            ]
+        ];
+
+        // 解析媒体行
+        foreach ($parsedSdp->getMediaDescriptions() as $media) {
+            if ($media->getType() === 'audio') {
+                // 获取编解码器信息
+                $rtpmap = $media->getRtpMap();
+                if (!empty($rtpmap)) {
+                    $mediaInfo['audio']['codec'] = $rtpmap[0]['encoding'];
+                    $mediaInfo['audio']['rate'] = $rtpmap[0]['rate'];
+                    $mediaInfo['audio']['channels'] = $rtpmap[0]['channels'] ?? 1;
+                }
+
+                // 获取 ptime
+                $fmtp = $media->getFmtp();
+                if (!empty($fmtp)) {
+                    foreach ($fmtp as $param) {
+                        if (strpos($param, 'ptime=') === 0) {
+                            $mediaInfo['audio']['ptime'] = (int)substr($param, 6);
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+
+        return $mediaInfo;
+    }
+
+    /**
+     * 创建 SDP Answer
+     * 根据收到的 SDP Offer 生成对应的 Answer
+     */
+    private function createSdpAnswer($parsedOffer): string
+    {
+        try {
+            $sdp = [];
+
+            // 会话级别属性
+            $sdp[] = "v=0";
+            $sdp[] = sprintf(
+                "o=php-sdp %d %d IN IP4 %s",
+                time(),
+                time(),
+                $this->config->get('LOCAL_IP')
+            );
+            $sdp[] = "s=RTP Audio Bridge Answer";
+            $sdp[] = "t=0 0";
+            $sdp[] = sprintf("c=IN IP4 %s", $this->config->get('LOCAL_IP'));
+
+            // 添加会话级属性
+            $sdp[] = "a=msid-semantic: WMS *";
+
+            // 处理音频媒体描述
+            foreach ($parsedOffer->getMediaDescriptions() as $media) {
+                if ($media->getType() === 'audio') {
+                    // 获取支持的编解码器
+                    $supportedCodecs = $this->getSupportedCodecs($media);
+                    if (empty($supportedCodecs)) {
+                        throw new MediaException('No compatible codecs found');
+                    }
+
+                    // 添加媒体行
+                    $sdp[] = sprintf(
+                        "m=audio %d RTP/AVP %s",
+                        $this->allocateRtpPort(),
+                        implode(' ', array_column($supportedCodecs, 'payload'))
+                    );
+
+                    // 添加连接信息
+                    $sdp[] = sprintf("c=IN IP4 %s", $this->config->get('LOCAL_IP'));
+
+                    // 添加编解码器信息
+                    foreach ($supportedCodecs as $codec) {
+                        $sdp[] = sprintf(
+                            "a=rtpmap:%d %s/%d%s",
+                            $codec['payload'],
+                            $codec['name'],
+                            $codec['rate'],
+                            isset($codec['channels']) && $codec['channels'] > 1 ? '/' . $codec['channels'] : ''
+                        );
+
+                        if (isset($codec['fmtp'])) {
+                            $sdp[] = sprintf("a=fmtp:%d %s", $codec['payload'], $codec['fmtp']);
+                        }
+                    }
+
+                    // 添加其他媒体属性
+                    $sdp[] = "a=sendrecv";
+                    $sdp[] = "a=rtcp-mux";
+                    $sdp[] = "a=maxptime:20";
+                    $sdp[] = "a=ptime:20";
+
+                    break;
+                }
+            }
+
+            return implode("\r\n", $sdp) . "\r\n";
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to create SDP answer', [
+                'error' => $e->getMessage()
+            ]);
+            throw new MediaException('Failed to create SDP answer: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 获取支持的编解码器
+     */
+    private function getSupportedCodecs($mediaDescription): array
+    {
+        $supportedCodecs = [];
+        $offeredFormats = $mediaDescription->getFormats();
+        $rtpMap = $mediaDescription->getRtpMap();
+
+        foreach (self::DEFAULT_AUDIO_CODECS as $codec) {
+            foreach ($offeredFormats as $index => $format) {
+                if ($format == $codec['payload']) {
+                    // 检查 rtpmap 是否匹配
+                    if (isset($rtpMap[$index])) {
+                        $map = $rtpMap[$index];
+                        if (
+                            $map['encoding'] === $codec['name'] &&
+                            $map['rate'] === $codec['rate'] &&
+                            ($map['channels'] ?? 1) === $codec['channels']
+                        ) {
+                            $supportedCodecs[] = $codec;
+                            break;
+                        }
+                    } else {
+                        // 如果没有 rtpmap，使用静态 payload type
+                        $supportedCodecs[] = $codec;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return $supportedCodecs;
+    }
+
+    /**
+     * 获取 Janus RTP 信息
+     */
+    public function getJanusRtpInfo(int $roomId): array
+    {
+        try {
+            $this->logger->info('Getting Janus RTP info', [
+                'roomId' => $roomId
+            ]);
+
+            // 从 Janus 获取房间的 RTP 配置
+            $response = $this->janusGateway->getRoomRtpInfo($this->sessionId, $this->handleId, $roomId);
+
+            if (!isset($response['data'])) {
+                throw new MediaException('Invalid response from Janus');
+            }
+
+            return [
+                'ip' => $response['data']['ip'] ?? $this->config->get('JANUS_HOST'),
+                'port' => (int)($response['data']['port'] ?? $this->config->get('JANUS_RTP_PORT')),
+                'codec' => $response['data']['codec'] ?? 'opus',
+                'ptime' => (int)($response['data']['ptime'] ?? 20)
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to get Janus RTP info', [
+                'error' => $e->getMessage(),
+                'roomId' => $roomId
+            ]);
+            throw new MediaException('Failed to get Janus RTP info: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 从 SDP 中获取 RTP 信息
+     */
+    public function getRtpInfoFromSdp(string $sdp): array
+    {
+        try {
+            $this->logger->debug('Extracting RTP info from SDP', [
+                'sdp' => $sdp
+            ]);
+
+            $lines = explode("\r\n", $sdp);
+            $rtpInfo = [
+                'ip' => '',
+                'port' => 0,
+                'codec' => '',
+                'ptime' => 20
+            ];
+
+            $currentMedia = null;
+
+            foreach ($lines as $line) {
+                // 解析媒体行 (m=audio 49170 RTP/AVP 0)
+                if (strpos($line, 'm=audio') === 0) {
+                    $parts = explode(' ', $line);
+                    $rtpInfo['port'] = (int)$parts[1];
+                    $currentMedia = 'audio';
+                }
+                // 解析连接信息行 (c=IN IP4 224.2.17.12)
+                elseif (strpos($line, 'c=IN IP4') === 0) {
+                    $parts = explode(' ', $line);
+                    $rtpInfo['ip'] = end($parts);
+                }
+                // 解析编解码器信息 (a=rtpmap:0 PCMU/8000)
+                elseif ($currentMedia === 'audio' && strpos($line, 'a=rtpmap:') === 0) {
+                    $parts = explode(' ', substr($line, 9));
+                    $codecInfo = explode('/', $parts[1]);
+                    $rtpInfo['codec'] = $codecInfo[0];
+                }
+                // 解析打包时间 (a=ptime:20)
+                elseif ($currentMedia === 'audio' && strpos($line, 'a=ptime:') === 0) {
+                    $rtpInfo['ptime'] = (int)substr($line, 8);
+                }
+            }
+
+            $this->logger->debug('Extracted RTP info', [
+                'rtpInfo' => $rtpInfo
+            ]);
+
+            return $rtpInfo;
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to extract RTP info from SDP', [
+                'error' => $e->getMessage()
+            ]);
+            throw new MediaException('Failed to extract RTP info from SDP: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 更新 RTP 转发配置
+     */
+    public function updateRtpForwarding(string $callId, array $rtpInfo): void
+    {
+        try {
+            $this->logger->info('Updating RTP forwarding', [
+                'callId' => $callId,
+                'rtpInfo' => $rtpInfo
+            ]);
+
+            if (!isset($this->activeMediaSessions[$callId])) {
+                throw new MediaException('No active media session found for call ID: ' . $callId);
+            }
+
+            $session = $this->activeMediaSessions[$callId];
+            if (!isset($session['rtp_forwarding'])) {
+                throw new MediaException('No RTP forwarding configuration found for this session');
+            }
+
+            // 停止现有的转发
+            foreach ($session['rtp_forwarding'] as $direction => $config) {
+                $this->stopRtpStream($config);
+            }
+
+            // 更新配置
+            $asteriskToJanusConfig = [
+                'callId' => $callId,
+                'sourceIp' => $rtpInfo['local_ip'] ?? $this->config->get('LOCAL_IP'),
+                'sourcePort' => $rtpInfo['local_port'] ?? $this->allocateRtpPort(),
+                'targetIp' => $rtpInfo['remote_ip'],
+                'targetPort' => $rtpInfo['remote_port'],
+                'direction' => 'asterisk_to_janus'
+            ];
+
+            $janusToAsteriskConfig = [
+                'callId' => $callId,
+                'sourceIp' => $rtpInfo['remote_ip'],
+                'sourcePort' => $rtpInfo['remote_port'],
+                'targetIp' => $rtpInfo['local_ip'] ?? $this->config->get('LOCAL_IP'),
+                'targetPort' => $rtpInfo['local_port'] ?? $this->allocateRtpPort(),
+                'direction' => 'janus_to_asterisk'
+            ];
+
+            // 启动新的转发
+            $this->startRtpStream($asteriskToJanusConfig);
+            $this->startRtpStream($janusToAsteriskConfig);
+
+            // 更新会话配置
+            $this->activeMediaSessions[$callId]['rtp_forwarding'] = [
+                'asterisk_to_janus' => $asteriskToJanusConfig,
+                'janus_to_asterisk' => $janusToAsteriskConfig
+            ];
+
+            $this->logger->info('Updated RTP forwarding configuration', [
+                'callId' => $callId,
+                'config' => $this->activeMediaSessions[$callId]['rtp_forwarding']
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to update RTP forwarding', [
+                'error' => $e->getMessage(),
+                'callId' => $callId
+            ]);
+            throw new MediaException('Failed to update RTP forwarding: ' . $e->getMessage());
+        }
     }
 }

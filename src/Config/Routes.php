@@ -114,5 +114,18 @@ return function (Router $router) {
         $route->add('POST', '/call', [PbxController::class, 'makeCall']);
         $route->add('GET', '/call/status/{extension}', [PbxController::class, 'getCallStatus']);
         $route->add('GET', '/channels', [PbxController::class, 'getActiveChannels']);
+
+        // SIP 信令相关路由
+        $route->add('POST', '/sip/inbound', [PbxController::class, 'handleInboundCall']);
+        $route->add('POST', '/sip/response', [PbxController::class, 'handleSipResponse']);
+        $route->add('POST', '/sip/bye', [PbxController::class, 'handleSipBye']);
+
+        // SDP 协商相关路由
+        $route->add('POST', '/sdp/offer', [PbxController::class, 'handleSdpOffer']);
+        $route->add('POST', '/sdp/answer', [PbxController::class, 'handleSdpAnswer']);
+
+        // RTP 相关路由
+        $route->add('POST', '/rtp/start', [PbxController::class, 'startRtpForwarding']);
+        $route->add('POST', '/rtp/stop', [PbxController::class, 'stopRtpForwarding']);
     });
 };

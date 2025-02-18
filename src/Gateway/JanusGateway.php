@@ -9,6 +9,7 @@ use App\Exceptions\GatewayException;
 use App\Logs\Logger;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use App\Exceptions\JanusException;
 
 class JanusGateway
 {
@@ -43,10 +44,25 @@ class JanusGateway
 
     /**
      * 发送请求到 Janus 服务器
+     *
+     * @param string $sessionId 会话ID
+     * @param string|null $handleId 处理器ID
+     * @param array $data 请求数据
+     * @return array 响应数据
+     * @throws JanusException
      */
-    public function sendRequest(string $endpoint, array $data): array
+    public function sendRequest(?string $sessionId, ?string $handleId, array $data): array
     {
         try {
+            // 构建 URL
+            $url = rtrim($this->config->get('JANUS_API_URL'), '/');
+            if ($sessionId) {
+                $url .= '/' . $sessionId;
+                if ($handleId) {
+                    $url .= '/' . $handleId;
+                }
+            }
+
             // 添加 API Secret
             $data['apisecret'] = $this->apiSecret;
 
@@ -54,10 +70,6 @@ class JanusGateway
             if (!isset($data['transaction'])) {
                 $data['transaction'] = $this->generateTransactionId();
             }
-
-            // 确保 endpoint 以 / 开头
-            $endpoint = ltrim($endpoint, '/');
-            $url = $endpoint ? "{$this->baseUrl}/{$endpoint}" : $this->baseUrl;
 
             $this->logger->debug("Sending request to Janus", [
                 'url' => $url,
@@ -69,7 +81,7 @@ class JanusGateway
                 'json' => $data,
             ];
 
-            if (str_contains($endpoint, '/trickle')) {
+            if ($handleId && str_contains($url, '/trickle')) {
                 $options['timeout'] = 2.0; // trickle 请求使用更短的超时时间
             }
 
@@ -78,13 +90,13 @@ class JanusGateway
             // 检查状态码
             $statusCode = $response->getStatusCode();
             if ($statusCode !== 200) {
-                throw new GatewayException("Janus returned non-200 status code: $statusCode");
+                throw new JanusException("Janus returned non-200 status code: $statusCode");
             }
 
             $contents = $response->getBody()->getContents();
 
             // 特殊处理 trickle 请求
-            if (str_contains($endpoint, '/trickle')) {
+            if ($handleId && str_contains($url, '/trickle')) {
                 // 如果是空响应或者响应体很小，都认为是正常的
                 if (empty($contents) || strlen($contents) < 5) {
                     return [
@@ -95,20 +107,13 @@ class JanusGateway
             }
 
             $result = json_decode($contents, true);
-
-            if (!$result && !str_contains($endpoint, '/trickle')) {
-                throw new \Exception('Invalid response from Janus server');
+            if (!is_array($result)) {
+                throw new JanusException('Invalid JSON response from Janus');
             }
 
-            return $result ?: [];
-        } catch (\Exception $e) {
-            $this->logger->error("Failed to communicate with Janus", [
-                'error' => $e->getMessage(),
-                'endpoint' => $endpoint,
-                'data' => $data
-            ]);
-
-            throw new GatewayException("Failed to communicate with Janus: " . $e->getMessage());
+            return $result;
+        } catch (GuzzleException $e) {
+            throw new JanusException('Failed to send request to Janus: ' . $e->getMessage());
         }
     }
 
@@ -117,46 +122,77 @@ class JanusGateway
      */
     public function createSession(): array
     {
-        return $this->sendRequest('', [
-            'janus' => 'create',
-            'transaction' => $this->generateTransactionId()
-        ]);
+        try {
+            $request = [
+                'janus' => 'create',
+            ];
+
+            return $this->sendRequest(null, null, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to create session: ' . $e->getMessage());
+        }
     }
 
     /**
      * 附加到插件
      */
-    public function attachPlugin(string $sessionId, string $plugin = self::PLUGIN_AUDIOBRIDGE): array
+    public function attachPlugin(string $sessionId): array
     {
-        return $this->sendRequest("$sessionId", [
-            'janus' => 'attach',
-            'plugin' => $plugin,
-            'transaction' => $this->generateTransactionId()
-        ]);
+        try {
+            $request = [
+                'janus' => 'attach',
+                'plugin' => 'janus.plugin.audiobridge'
+            ];
+
+            return $this->sendRequest($sessionId, null, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to attach plugin: ' . $e->getMessage());
+        }
     }
 
     /**
      * 创建音频房间
      */
-    public function createAudioRoom(string $sessionId, string $handleId, array $config): array
+    public function createAudioRoom(string $sessionId, string $handleId, array $roomConfig): array
     {
-        if (empty($config['roomId']) || !is_numeric($config['roomId'])) {
-            throw new GatewayException('Room ID must be a positive integer');
-        }
+        try {
+            $request = [
+                'janus' => 'message',
+                'body' => [
+                    'request' => 'create',
+                    'room' => $roomConfig['roomId'],
+                    'description' => $roomConfig['description'],
+                    'sampling_rate' => $roomConfig['sampling_rate'],
+                    'spatial_audio' => $roomConfig['spatial_audio'],
+                    'record' => $roomConfig['record'],
+                    'notify_joining' => $roomConfig['notify_joining']
+                ]
+            ];
 
-        return $this->sendRequest("$sessionId/$handleId", [
-            'janus' => 'message',
-            'body' => [
-                'request' => 'create',
-                'room' => (int)$config['roomId'],
-                'description' => $config['description'] ?? '',
-                'sampling_rate' => $config['sampling_rate'] ?? 16000,
-                'spatial_audio' => $config['spatial_audio'] ?? false,
-                'record' => false,
-                'permanent' => false
-            ],
-            'transaction' => $this->generateTransactionId()
-        ]);
+            return $this->sendRequest($sessionId, $handleId, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to create audio room: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 销毁音频房间
+     */
+    public function destroyAudioRoom(string $sessionId, string $handleId, int $roomId): array
+    {
+        try {
+            $request = [
+                'janus' => 'message',
+                'body' => [
+                    'request' => 'destroy',
+                    'room' => $roomId
+                ]
+            ];
+
+            return $this->sendRequest($sessionId, $handleId, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to destroy audio room: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -164,16 +200,145 @@ class JanusGateway
      */
     public function joinAudioRoom(string $sessionId, string $handleId, int $roomId, string $display): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
-            "janus" => "message",
-            "body" => [
-                "request" => "join",
-                "room" => $roomId,
-                "display" => $display,
-                "muted" => false,
-            ],
-            "transaction" => $this->generateTransactionId()
-        ]);
+        try {
+            $request = [
+                'janus' => 'message',
+                'body' => [
+                    'request' => 'join',
+                    'room' => $roomId,
+                    'display' => $display,
+                    'muted' => false
+                ]
+            ];
+
+            return $this->sendRequest($sessionId, $handleId, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to join audio room: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 离开音频房间
+     */
+    public function leaveAudioRoom(string $sessionId, string $handleId, int $roomId): array
+    {
+        try {
+            $request = [
+                'janus' => 'message',
+                'body' => [
+                    'request' => 'leave',
+                    'room' => $roomId
+                ]
+            ];
+
+            return $this->sendRequest($sessionId, $handleId, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to leave audio room: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 列出房间参与者
+     */
+    public function listParticipants(string $sessionId, string $handleId, int $roomId): array
+    {
+        try {
+            $request = [
+                'janus' => 'message',
+                'body' => [
+                    'request' => 'listparticipants',
+                    'room' => $roomId
+                ]
+            ];
+
+            return $this->sendRequest($sessionId, $handleId, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to list participants: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 发送 ICE Trickle
+     */
+    public function sendTrickle(string $sessionId, string $handleId, array $candidate): array
+    {
+        try {
+            $request = [
+                'janus' => 'trickle',
+                'candidate' => $candidate
+            ];
+
+            return $this->sendRequest($sessionId, $handleId, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to send trickle: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 发送 ICE Trickle Complete
+     */
+    public function sendTrickleComplete(string $sessionId, string $handleId): array
+    {
+        try {
+            $request = [
+                'janus' => 'trickle',
+                'candidate' => [
+                    'completed' => true
+                ]
+            ];
+
+            return $this->sendRequest($sessionId, $handleId, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to send trickle complete: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 列出所有句柄
+     */
+    public function listHandles(string $sessionId): array
+    {
+        try {
+            $request = [
+                'janus' => 'list_handles'
+            ];
+
+            return $this->sendRequest($sessionId, null, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to list handles: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 获取句柄信息
+     */
+    public function handleInfo(string $sessionId, string $handleId): array
+    {
+        try {
+            $request = [
+                'janus' => 'handle_info'
+            ];
+
+            return $this->sendRequest($sessionId, $handleId, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to get handle info: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 销毁会话
+     */
+    public function destroySession(string $sessionId): array
+    {
+        try {
+            $request = [
+                'janus' => 'destroy'
+            ];
+
+            return $this->sendRequest($sessionId, null, $request);
+        } catch (\Exception $e) {
+            throw new JanusException('Failed to destroy session: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -181,7 +346,7 @@ class JanusGateway
      */
     public function createSipBridgeSession(string $sessionId, string $handleId, array $config): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'bridge',
@@ -196,7 +361,9 @@ class JanusGateway
                 'quality' => $config['quality'] ?? 4,
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
+        ];
+
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -204,7 +371,7 @@ class JanusGateway
      */
     public function updateSipBridge(string $sessionId, string $handleId, array $config): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'update_bridge',
@@ -212,7 +379,9 @@ class JanusGateway
                 'quality' => $config['quality'] ?? 4,
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
+        ];
+
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -220,13 +389,15 @@ class JanusGateway
      */
     public function disconnectSipBridge(string $sessionId, string $handleId): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'disconnect'
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
+        ];
+
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -234,7 +405,7 @@ class JanusGateway
      */
     public function registerSip(string $sessionId, string $handleId, array $config): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'register',
@@ -247,7 +418,9 @@ class JanusGateway
                 'refresh' => true
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
+        ];
+
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -255,7 +428,7 @@ class JanusGateway
      */
     public function makeCall(string $sessionId, string $handleId, array $config): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'call',
@@ -265,7 +438,9 @@ class JanusGateway
                 'srtp' => 'sdes_optional'
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
+        ];
+
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -273,13 +448,15 @@ class JanusGateway
      */
     public function acceptCall(string $sessionId, string $handleId): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'accept'
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
+        ];
+
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -287,13 +464,15 @@ class JanusGateway
      */
     public function hangupCall(string $sessionId, string $handleId): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'hangup'
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
+        ];
+
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -301,29 +480,16 @@ class JanusGateway
      */
     public function sendDtmf(string $sessionId, string $handleId, string $digit): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'dtmf_info',
                 'digit' => $digit
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
-    }
+        ];
 
-    /**
-     * 获取房间参与者列表
-     */
-    public function listParticipants(string $sessionId, string $handleId, string $roomId): array
-    {
-        return $this->sendRequest("$sessionId/$handleId", [
-            "janus" => "message",
-            "body" => [
-                "request" => "listparticipants",
-                "room" => (int)$roomId
-            ],
-            "transaction" => $this->generateTransactionId()
-        ]);
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -331,13 +497,15 @@ class JanusGateway
      */
     public function getSipPluginStatus(string $sessionId, string $handleId): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'status'
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
+        ];
+
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -345,7 +513,7 @@ class JanusGateway
      */
     public function sendSipInfo(string $sessionId, string $handleId, array $info): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'info',
@@ -353,7 +521,9 @@ class JanusGateway
                 'content' => $info['content'] ?? '',
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
+        ];
+
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -361,7 +531,7 @@ class JanusGateway
      */
     public function updateCallMedia(string $sessionId, string $handleId, array $media): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'update',
@@ -370,7 +540,9 @@ class JanusGateway
                 'data' => $media['data'] ?? false,
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
+        ];
+
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -378,13 +550,15 @@ class JanusGateway
      */
     public function getCallStats(string $sessionId, string $handleId): array
     {
-        return $this->sendRequest("$sessionId/$handleId", [
+        $request = [
             'janus' => 'message',
             'body' => [
                 'request' => 'callstats'
             ],
             'transaction' => $this->generateTransactionId()
-        ]);
+        ];
+
+        return $this->sendRequest($sessionId, $handleId, $request);
     }
 
     /**
@@ -451,35 +625,58 @@ class JanusGateway
     }
 
     /**
-     * 获取会话的所有句柄
+     * 获取房间的 RTP 信息
      */
-    public function listHandles(string $sessionId): array
+    public function getRoomRtpInfo(string $sessionId, string $handleId, int $roomId): array
     {
-        return $this->sendRequest($sessionId, [
-            'janus' => 'list_handles',
-            'transaction' => $this->generateTransactionId()
-        ]);
-    }
+        try {
+            $this->logger->info('Getting room RTP info', [
+                'sessionId' => $sessionId,
+                'handleId' => $handleId,
+                'roomId' => $roomId
+            ]);
 
-    /**
-     * 获取句柄信息
-     */
-    public function handleInfo(string $sessionId, string $handleId): array
-    {
-        return $this->sendRequest("$sessionId/$handleId", [
-            'janus' => 'handle_info',
-            'transaction' => $this->generateTransactionId()
-        ]);
-    }
+            $request = [
+                'janus' => 'message',
+                'transaction' => $this->generateTransactionId(),
+                'body' => [
+                    'request' => 'listparticipants',
+                    'room' => $roomId
+                ]
+            ];
 
-    /**
-     * 销毁会话
-     */
-    public function destroySession(string $sessionId): array
-    {
-        return $this->sendRequest($sessionId, [
-            'janus' => 'destroy',
-            'transaction' => $this->generateTransactionId()
-        ]);
+            $response = $this->sendRequest($sessionId, $handleId, $request);
+
+            if (!isset($response['plugindata']['data']['participants'])) {
+                throw new JanusException('Invalid response format');
+            }
+
+            // 从参与者信息中提取 RTP 配置
+            $rtpInfo = [
+                'data' => [
+                    'ip' => $this->config->get('JANUS_HOST'),
+                    'port' => (int)$this->config->get('JANUS_RTP_PORT'),
+                    'codec' => 'opus',
+                    'ptime' => 20
+                ]
+            ];
+
+            // 如果房间中有参与者，使用第一个参与者的 RTP 配置
+            $participants = $response['plugindata']['data']['participants'];
+            if (!empty($participants)) {
+                $participant = $participants[0];
+                if (isset($participant['rtp'])) {
+                    $rtpInfo['data'] = array_merge($rtpInfo['data'], $participant['rtp']);
+                }
+            }
+
+            return $rtpInfo;
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to get room RTP info', [
+                'error' => $e->getMessage(),
+                'roomId' => $roomId
+            ]);
+            throw new JanusException('Failed to get room RTP info: ' . $e->getMessage());
+        }
     }
 }
