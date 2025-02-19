@@ -30,42 +30,62 @@ interface JanusInstance {
 export const useJanus = () => {
   const [janus, setJanus] = useState<JanusInstance | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
+
+  const initJanus = useCallback(async () => {
+    try {
+      setIsInitializing(true);
+      setError(null);
+
+      const response = await api.post<JanusResponse>("/api/janus/session");
+      if (response.data.success) {
+        const instance: JanusInstance = {
+          ...response.data.data,
+          on: (event: string, callback: (data: any) => void) => {
+            window.addEventListener(`janus:${event}`, (e: any) =>
+              callback(e.detail)
+            );
+          },
+          off: (event: string, callback: (data: any) => void) => {
+            window.removeEventListener(`janus:${event}`, (e: any) =>
+              callback(e.detail)
+            );
+          },
+        };
+        setJanus(instance);
+        setRetryCount(0); // Reset retry count on success
+      } else {
+        throw new Error("Failed to initialize Janus session");
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      console.error("Janus initialization error:", errorMessage);
+
+      if (retryCount < MAX_RETRIES) {
+        setRetryCount((prev) => prev + 1);
+        // Exponential backoff: 2^retry * 1000ms (1s, 2s, 4s)
+        const retryDelay = Math.pow(2, retryCount) * 1000;
+        console.log(
+          `Retrying in ${retryDelay}ms... (Attempt ${retryCount + 1}/${MAX_RETRIES})`
+        );
+        setTimeout(initJanus, retryDelay);
+      } else {
+        setError(
+          `Failed to connect to Janus server after ${MAX_RETRIES} attempts`
+        );
+      }
+    } finally {
+      setIsInitializing(false);
+    }
+  }, [retryCount]);
 
   useEffect(() => {
-    const initJanus = async () => {
-      try {
-        const response = await api.post<JanusResponse>("/api/janus/session");
-        if (response.data.success) {
-          const instance: JanusInstance = {
-            ...response.data.data,
-            on: (event: string, callback: (data: any) => void) => {
-              // 实现事件监听
-              window.addEventListener(`janus:${event}`, (e: any) =>
-                callback(e.detail)
-              );
-            },
-            off: (event: string, callback: (data: any) => void) => {
-              // 移除事件监听
-              window.removeEventListener(`janus:${event}`, (e: any) =>
-                callback(e.detail)
-              );
-            },
-          };
-          setJanus(instance);
-        } else {
-          setError("Failed to initialize Janus session");
-        }
-      } catch (err) {
-        setError("Failed to connect to Janus server");
-        console.error("Janus initialization error:", err);
-      }
-    };
-
     initJanus();
 
     return () => {
       if (janus) {
-        // 清理 Janus 会话
         api
           .delete(`/api/janus/session/${janus.sessionId}`)
           .catch(console.error);
@@ -129,11 +149,18 @@ export const useJanus = () => {
     }
   }, [janus]);
 
+  const reconnect = useCallback(async () => {
+    setRetryCount(0); // Reset retry count before reconnecting
+    await initJanus();
+  }, [initJanus]);
+
   return {
     janus,
     error,
+    isInitializing,
     createSipBridge,
     updateSipBridge,
     disconnectSipBridge,
+    reconnect,
   };
 };

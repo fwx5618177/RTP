@@ -25,8 +25,14 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
+      "/janus": {
+        target: "http://localhost:8088",
+        changeOrigin: true,
+        ws: true,
+        rewrite: (path) => path.replace(/^\/janus/, ""),
+      },
       "/ws": {
-        target: "ws://localhost:8000",
+        target: "ws://localhost:8088",
         ws: true,
       },
     },

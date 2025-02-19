@@ -443,12 +443,14 @@ export class JanusClient {
       clearInterval(this.keepaliveInterval);
     }
 
-    this.keepaliveInterval = setInterval(() => {
-      this.sendKeepalive().catch((error) => {
+    this.keepaliveInterval = setInterval(async () => {
+      try {
+        await this.sendKeepalive();
+      } catch (error) {
         console.error("Keepalive failed:", error);
         this.handleConnectionError();
-      });
-    }, 30000); // 30 seconds
+      }
+    }, 30000); // Send keepalive every 30 seconds
   }
 
   private async sendKeepalive() {
@@ -470,23 +472,47 @@ export class JanusClient {
   }
 
   private async handleConnectionError() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      this.disconnect();
-      throw new Error("Maximum reconnection attempts reached");
-    }
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(
+        `Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+      );
 
-    this.reconnectAttempts++;
-    console.log(
-      `Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`
-    );
+      try {
+        // Stop keepalive during reconnection
+        if (this.keepaliveInterval) {
+          clearInterval(this.keepaliveInterval);
+          this.keepaliveInterval = null;
+        }
 
-    try {
-      if (this.currentRoomId && this.currentDisplay) {
-        await this.joinRoom(this.currentRoomId, this.currentDisplay);
+        // Create new session
+        const response = await api.post("/api/janus/session");
+        if (response.data.success) {
+          this.config.sessionId = response.data.data.sessionId;
+          this.config.handleId = response.data.data.handleId;
+
+          // Restart keepalive
+          this.startKeepalive();
+
+          // Reinitialize peer connection
+          this.initializePeerConnection();
+
+          // Rejoin room if was in one
+          if (this.currentRoomId && this.currentDisplay) {
+            await this.joinRoom(this.currentRoomId, this.currentDisplay);
+          }
+
+          console.log("Successfully reconnected to Janus server");
+          this.reconnectAttempts = 0;
+        }
+      } catch (error) {
+        console.error("Reconnection attempt failed:", error);
+        // Try again after delay
+        setTimeout(() => this.handleConnectionError(), 5000);
       }
-    } catch (error) {
-      console.error("Reconnection failed:", error);
-      setTimeout(() => this.handleConnectionError(), 5000);
+    } else {
+      console.error("Max reconnection attempts reached");
+      this.disconnect();
     }
   }
 
