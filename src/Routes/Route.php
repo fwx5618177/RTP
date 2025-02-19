@@ -73,8 +73,8 @@ class Route
         [$controllerClass, $methodName] = $this->handler;
         $container = $request->getContainer();
 
-        // 使用容器创建控制器实例
-        $controller = new $controllerClass($container);
+        // 从容器中获取控制器实例
+        $controller = $container->get($controllerClass);
 
         // 提取路由参数
         $params = $this->extractRouteParams($request);

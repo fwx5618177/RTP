@@ -765,7 +765,7 @@ class MediaManager
     /**
      * 获取 RTP 流统计信息
      */
-    public function getRtpStats(string $callId, string $direction = null): array
+    public function getRtpStats(string $callId, ?string $direction = null): array
     {
         $stats = [];
         $pattern = $direction ? sprintf('%s_%s', $callId, $direction) : $callId . '_';
