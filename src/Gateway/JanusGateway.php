@@ -636,39 +636,62 @@ class JanusGateway
                 'roomId' => $roomId
             ]);
 
-            $request = [
+            // 1. 先获取房间信息
+            $roomRequest = [
                 'janus' => 'message',
                 'transaction' => $this->generateTransactionId(),
                 'body' => [
-                    'request' => 'listparticipants',
+                    'request' => 'get_room',
                     'room' => $roomId
                 ]
             ];
+            $roomResponse = $this->sendRequest($sessionId, $handleId, $roomRequest);
 
-            $response = $this->sendRequest($sessionId, $handleId, $request);
-
-            if (!isset($response['plugindata']['data']['participants'])) {
-                throw new JanusException('Invalid response format');
+            if (!isset($roomResponse['plugindata']['data']['room'])) {
+                throw new JanusException('Room not found');
             }
 
-            // 从参与者信息中提取 RTP 配置
+            // 2. 获取房间的 RTP 配置
+            $rtpRequest = [
+                'janus' => 'message',
+                'transaction' => $this->generateTransactionId(),
+                'body' => [
+                    'request' => 'rtp_forward',
+                    'room' => $roomId,
+                    'publisher_id' => 0,  // 0 表示获取房间默认配置
+                    'audio' => true,
+                    'video' => false,
+                    'data' => false
+                ]
+            ];
+            $rtpResponse = $this->sendRequest($sessionId, $handleId, $rtpRequest);
+
+            // 3. 解析 RTP 配置
             $rtpInfo = [
                 'data' => [
                     'ip' => $this->config->get('JANUS_HOST'),
                     'port' => (int)$this->config->get('JANUS_RTP_PORT'),
                     'codec' => 'opus',
-                    'ptime' => 20
+                    'ptime' => 20,
+                    'room' => $roomId
                 ]
             ];
 
-            // 如果房间中有参与者，使用第一个参与者的 RTP 配置
-            $participants = $response['plugindata']['data']['participants'];
-            if (!empty($participants)) {
-                $participant = $participants[0];
-                if (isset($participant['rtp'])) {
-                    $rtpInfo['data'] = array_merge($rtpInfo['data'], $participant['rtp']);
-                }
+            // 如果有具体的 RTP 配置，使用返回的配置
+            if (isset($rtpResponse['plugindata']['data']['rtp'])) {
+                $rtp = $rtpResponse['plugindata']['data']['rtp'];
+                $rtpInfo['data'] = array_merge($rtpInfo['data'], [
+                    'ip' => $rtp['ip'] ?? $rtpInfo['data']['ip'],
+                    'port' => (int)($rtp['port'] ?? $rtpInfo['data']['port']),
+                    'codec' => $rtp['codec'] ?? $rtpInfo['data']['codec'],
+                    'ptime' => (int)($rtp['ptime'] ?? $rtpInfo['data']['ptime'])
+                ]);
             }
+
+            $this->logger->debug('Got room RTP info', [
+                'roomId' => $roomId,
+                'rtpInfo' => $rtpInfo
+            ]);
 
             return $rtpInfo;
         } catch (\Exception $e) {

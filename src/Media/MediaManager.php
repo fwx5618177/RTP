@@ -503,45 +503,68 @@ class MediaManager
     /**
      * 开始 RTP 转发
      */
-    public function startRtpForwarding(string $callId, string $targetIp, int $targetPort): array
+    public function startRtpForwarding(string $callId, string $sourceIp, int $sourcePort, string $targetIp, int $targetPort): array
     {
         try {
             $this->logger->info('Starting RTP forwarding', [
                 'callId' => $callId,
-                'targetIp' => $targetIp,
-                'targetPort' => $targetPort
+                'source' => "$sourceIp:$sourcePort",
+                'target' => "$targetIp:$targetPort"
             ]);
 
-            if (!isset($this->activeMediaSessions[$callId])) {
-                throw new MediaException('No active media session found for call ID: ' . $callId);
+            // 1. 创建 RTP socket
+            $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+            if ($socket === false) {
+                throw new MediaException('Failed to create socket: ' . socket_strerror(socket_last_error()));
             }
 
-            $session = $this->activeMediaSessions[$callId];
-            if ($session['status'] !== 'negotiated') {
-                throw new MediaException('Media session not in negotiated state');
+            // 2. 绑定到源地址和端口
+            if (!socket_bind($socket, $sourceIp, $sourcePort)) {
+                throw new MediaException('Failed to bind socket: ' . socket_strerror(socket_last_error()));
             }
 
-            // 配置 RTP 转发
-            $rtpConfig = [
-                'sourceIp' => $this->config->get('LOCAL_IP'),
-                'sourcePort' => $this->allocateRtpPort(),
-                'targetIp' => $targetIp,
-                'targetPort' => $targetPort,
-                'codec' => $session['mediaInfo']['audio']['codec'],
-                'ptime' => $session['mediaInfo']['audio']['ptime'],
-                'ssrc' => mt_rand(1, 999999),
-                'direction' => 'sendrecv'
+            // 3. 设置 socket 选项
+            socket_set_option($socket, SOL_SOCKET, SO_RCVBUF, 2048576);
+            socket_set_option($socket, SOL_SOCKET, SO_SNDBUF, 2048576);
+            socket_set_option($socket, SOL_SOCKET, SO_REUSEADDR, 1);
+
+            // 4. 启动转发进程
+            $pid = pcntl_fork();
+            if ($pid == -1) {
+                throw new MediaException('Failed to fork process');
+            }
+
+            if ($pid == 0) {
+                // 子进程：处理 RTP 转发
+                $this->handleRtpForwarding($socket, $targetIp, $targetPort);
+                exit(0);
+            }
+
+            // 5. 保存转发信息
+            $this->rtpSockets[$callId] = $socket;
+            $this->forwardingProcesses[$callId] = [
+                'pid' => $pid,
+                'source' => [
+                    'ip' => $sourceIp,
+                    'port' => $sourcePort
+                ],
+                'target' => [
+                    'ip' => $targetIp,
+                    'port' => $targetPort
+                ],
+                'start_time' => microtime(true)
             ];
 
-            // 启动 RTP 转发
-            $this->startRtpStream($rtpConfig);
-
-            // 更新会话状态
-            $this->activeMediaSessions[$callId]['rtp'] = $rtpConfig;
-            $this->activeMediaSessions[$callId]['status'] = 'streaming';
+            $this->logger->info('RTP forwarding started', [
+                'callId' => $callId,
+                'pid' => $pid
+            ]);
 
             return [
-                'rtpConfig' => $rtpConfig
+                'status' => 'forwarding',
+                'pid' => $pid,
+                'source' => "$sourceIp:$sourcePort",
+                'target' => "$targetIp:$targetPort"
             ];
         } catch (\Exception $e) {
             $this->logger->error('Failed to start RTP forwarding', [
@@ -549,6 +572,27 @@ class MediaManager
                 'callId' => $callId
             ]);
             throw new MediaException('Failed to start RTP forwarding: ' . $e->getMessage());
+        }
+    }
+
+    private function handleRtpForwarding($socket, string $targetIp, int $targetPort): void
+    {
+        $buffer = '';
+        $bufferSize = 2048;
+
+        while (true) {
+            // 接收 RTP 包
+            $received = socket_recvfrom($socket, $buffer, $bufferSize, 0, $sourceIp, $sourcePort);
+            if ($received === false) {
+                $this->logger->error('Failed to receive RTP packet: ' . socket_strerror(socket_last_error()));
+                continue;
+            }
+
+            // 转发 RTP 包
+            $sent = socket_sendto($socket, $buffer, $received, 0, $targetIp, $targetPort);
+            if ($sent === false) {
+                $this->logger->error('Failed to forward RTP packet: ' . socket_strerror(socket_last_error()));
+            }
         }
     }
 
@@ -1174,6 +1218,53 @@ class MediaManager
                 'callId' => $callId
             ]);
             throw new MediaException('Failed to update RTP forwarding: ' . $e->getMessage());
+        }
+    }
+
+    public function setupRtpForwarding(string $callId, array $config): void
+    {
+        try {
+            // 验证配置
+            if (!isset($config['asterisk']) || !isset($config['janus'])) {
+                throw new \InvalidArgumentException('Invalid RTP forwarding configuration');
+            }
+
+            $asterisk = $config['asterisk'];
+            $janus = $config['janus'];
+
+            // 验证必要的参数
+            foreach ([$asterisk, $janus] as $endpoint) {
+                if (!isset($endpoint['ip']) || !isset($endpoint['port'])) {
+                    throw new \InvalidArgumentException('Missing IP or port in RTP configuration');
+                }
+            }
+
+            // 设置 Asterisk 到 Janus 的 RTP 转发
+            $this->setupAsteriskToJanusRtp(
+                $callId,
+                [
+                    'ip' => $asterisk['ip'],
+                    'port' => $asterisk['port'],
+                    'codecs' => $asterisk['codecs'] ?? []
+                ],
+                [
+                    'ip' => $janus['ip'],
+                    'port' => $janus['port'],
+                    'codecs' => $janus['codecs'] ?? []
+                ]
+            );
+
+            $this->logger->info('RTP forwarding setup completed', [
+                'callId' => $callId,
+                'asterisk' => $asterisk,
+                'janus' => $janus
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to setup RTP forwarding', [
+                'error' => $e->getMessage(),
+                'callId' => $callId
+            ]);
+            throw $e;
         }
     }
 }

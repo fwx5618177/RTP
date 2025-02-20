@@ -224,36 +224,30 @@ certificates: {
 # times, but may not work in case the RTT of the user is high: as such,
 # you should pick a reasonable trade-off (usually 2*max expected RTT).
 media: {
-	#ipv6 = true
-	#ipv6_linklocal = true
-	#min_nack_queue = 500
-	#rtp_port_range = "20000-40000"
-	#dtls_mtu = 1200
-	#no_media_timer = 1
-	#slowlink_threshold = 4
-	#twcc_period = 100
-	#dtls_timeout = 500
+	ipv6 = false
+	ipv6_linklocal = false
+	min_nack_queue = 500
+	rtp_port_range = "10000-20000"
+	dtls_mtu = 1200
+	no_media_timer = 1
+	slowlink_threshold = 4
+	twcc_period = 100
+	dtls_timeout = 500
+	nack_optimizations = true
+	dscp = 46
 
-	# Janus can do some optimizations on the NACK queue, specifically when
-	# keyframes are involved. Namely, you can configure Janus so that any
-	# time a keyframe is sent to a user, the NACK buffer for that connection
-	# is emptied. This allows Janus to ignore NACK requests for packets
-	# sent shortly before the keyframe was sent, since it can be assumed
-	# that the keyframe will restore a complete working image for the user
-	# anyway (which is the main reason why video retransmissions are typically
-	# required). While this optimization is known to work fine in most cases,
-	# it can backfire in some edge cases, and so is disabled by default.
-	#nack_optimizations = true
+	# RTP/RTCP settings
+	rtp_keepalive_interval = 30
+	rtp_timeout = 60
+	rtp_max_missing = 100
+	rtp_audio_level_average = 25
+	rtp_audio_level_extension = true
 
-	# If you need DSCP packet marking and prioritization, you can configure
-	# the 'dscp' property to a specific values, and Janus will try to
-	# set it on all outgoing packets using libnice. Normally, the specs
-	# suggest to use different values depending on whether audio, video
-	# or data are used, but since all PeerConnections in Janus are bundled,
-	# we can only use one. You can refer to this document for more info:
-	# https://tools.ietf.org/html/draft-ietf-tsvwg-rtcweb-qos-18#page-6
-	# That said, DON'T TOUCH THIS IF YOU DON'T KNOW WHAT IT MEANS!
-	#dscp = 46
+	# RTP forwarding settings
+	rtp_forward_buffers = 10
+	rtp_forward_payload_type = 111  # opus
+	rtp_forward_ssrc_range = "1-999999"
+	rtp_forward_host_family = "ipv4"
 }
 
 # NAT-related stuff: specifically, you can configure the STUN/TURN

@@ -15,6 +15,9 @@ use App\Server\WebSocketServer;
 use App\Utils\Container;
 use DI\ContainerBuilder;
 use Doctrine\ORM\EntityManager;
+use App\Server\SipSignalingServer;
+use App\Services\AsteriskService;
+use App\Media\MediaManager;
 
 try {
     // 初始化 Config 实例
@@ -71,6 +74,24 @@ try {
 
     // 设置全局容器实例
     Container::setInstance($container);
+
+    // 创建并启动 SIP 信令服务器
+    $sipServer = new SipSignalingServer(
+        $container->get(AsteriskService::class),
+        $container->get(MediaManager::class)
+    );
+
+    // 在新进程中启动 SIP 信令服务器
+    $sipServerProcess = new \Swoole\Process(function ($worker) use ($sipServer, $logger) {
+        try {
+            $logger->info('Starting SIP signaling server...');
+            $sipServer->start();
+        } catch (\Exception $e) {
+            $logger->error('SIP server error: ' . $e->getMessage());
+            exit(1);
+        }
+    });
+    $sipServerProcess->start();
 
     // 在新进程中启动 WebSocket 服务器
     $pid = pcntl_fork();

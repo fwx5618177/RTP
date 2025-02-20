@@ -58,8 +58,8 @@ services:
     container_name: rtp-bridge-asterisk
     privileged: true
     ports:
-      - "5060:5060/udp" # SIP
-      - "5060:5060/tcp" # SIP
+      - "5061:5060/udp" # SIP
+      - "5061:5060/tcp" # SIP
       - "5038:5038" # AMI
       - "10000-10100:10000-10100/udp" # RTP ports
       - "8090:8088" # HTTP (AMI/ARI) - 将内部 8088 端口映射到外部 8090
