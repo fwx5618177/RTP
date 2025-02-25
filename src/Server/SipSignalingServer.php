@@ -34,7 +34,7 @@ class SipSignalingServer
             'worker_num' => 1,
             'daemonize' => false,
             'log_level' => SWOOLE_LOG_INFO,
-            'log_file' => __DIR__ . '/../../storage/logs/sip_server.log',
+            'log_file' => __DIR__ . '/../../logs/sip_server.log',
         ]);
 
         $this->server->on('Packet', [$this, 'handleSipPacket']);
