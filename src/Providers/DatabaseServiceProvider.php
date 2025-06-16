@@ -88,4 +88,53 @@ class DatabaseServiceProvider
 
         return self::$redis;
     }
+
+    public static function createEntityManager($connection = null): EntityManager
+    {
+        // 注册 UUID 类型
+        if (! Type::hasType('uuid')) {
+            Type::addType('uuid', UuidType::class);
+        }
+
+        $config = ORMSetup::createAttributeMetadataConfiguration(
+            paths: [__DIR__ . '/../../src'],
+            isDevMode: true,
+        );
+
+        $appConfig = \App\Config\Config::getInstance();
+
+        // 如果没有提供连接，创建新的连接
+        if (! $connection) {
+            $dbType = $appConfig->get('DB_TYPE', 'mysql');
+            $connection = \Doctrine\DBAL\DriverManager::getConnection([
+                'driver' => 'pdo_' . $dbType,
+                'host' => $appConfig->get('DB_HOST', 'localhost'),
+                'port' => $appConfig->get('DB_PORT', $dbType === 'mysql' ? 3306 : 5432),
+                'dbname' => $appConfig->get('DB_NAME', 'rtp_bridge'),
+                'user' => $appConfig->get('DB_USER', 'root'),
+                'password' => $appConfig->get('DB_PASS', 'password'),
+                'charset' => 'utf8mb4',
+            ]);
+        }
+
+        $em = new EntityManager($connection, $config);
+
+        // 注册 UUID 类型到数据库平台
+        $platform = $connection->getDatabasePlatform();
+        $platform->registerDoctrineTypeMapping('uuid', 'uuid');
+
+        return $em;
+    }
+
+    private static function getConfiguration()
+    {
+        $config = ORMSetup::createAttributeMetadataConfiguration(
+            paths: [__DIR__ . '/../Entity'],
+            isDevMode: true,
+        );
+
+        // 添加其他配置...
+
+        return $config;
+    }
 }

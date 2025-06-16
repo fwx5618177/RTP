@@ -1,6 +1,24 @@
 version: '3.8'
 
 services:
+  # Janus Gateway
+  janus-gateway:
+    container_name: rtp-bridge-janus
+    image: canyan/janus-gateway:latest
+    command: [ "/usr/local/bin/janus", "-F", "/usr/local/etc/janus" ]
+    ports:
+      - "8088:8088"
+      - "8089:8089"
+      - "8889:8889"
+      - "8000:8000"
+      - "7088:7088"
+      - "7089:7089"
+    volumes:
+      - ./dockers/config/janus.jcfg:/usr/local/etc/janus/janus.jcfg
+      - ./dockers/config/janus.eventhandler.sampleevh.jcfg:/usr/local/etc/janus/janus.eventhandler.sampleevh.jcfg
+      - ./dockers/config/janus.plugin.sip.jcfg:/usr/local/etc/janus/janus.plugin.sip.jcfg
+    restart: always
+
   # MySQL Database
   mysql:
     image: mysql:8.0
@@ -14,8 +32,6 @@ services:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
-    networks:
-      - rtp-bridge
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       interval: 30s
@@ -30,10 +46,30 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    networks:
-      - rtp-bridge
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Asterisk PBX
+  asterisk:
+    image: andrius/asterisk:latest
+    container_name: rtp-bridge-asterisk
+    privileged: true
+    ports:
+      - "5061:5060/udp" # SIP
+      - "5061:5060/tcp" # SIP
+      - "5038:5038" # AMI
+      - "10000-10100:10000-10100/udp" # RTP ports
+      - "8090:8088" # HTTP (AMI/ARI) - 将内部 8088 端口映射到外部 8090
+    volumes:
+      - ./dockers/config/asterisk:/etc/asterisk
+      - asterisk_sounds:/var/lib/asterisk/sounds
+      - asterisk_storage:/var/spool/asterisk
+    restart: always
+    healthcheck:
+      test: [ "CMD", "asterisk", "-rx", "core show version" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -41,7 +77,7 @@ services:
 volumes:
   db_data:
   redis_data:
+  asterisk_sounds:
+  asterisk_storage:
 
-networks:
-  rtp-bridge:
-    driver: bridge
+

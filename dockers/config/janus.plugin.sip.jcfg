@@ -1,0 +1,46 @@
+# SIP Plugin configuration
+general: {
+    # Janus SIP 插件的常规配置
+    local_ip = "172.18.0.4"               # Janus 的本地 IP
+    local_port = 5060                     # SIP 监听端口
+    register_ttl = 3600                   # 注册超时时间
+    behind_nat = false                    # NAT 穿透设置
+    user_agent = "Janus WebRTC Gateway SIP Plugin"
+    
+    # SIP 服务器设置（Asterisk）
+    proxy = "sip:172.18.0.5:5060"        # Asterisk 的地址
+    outbound_proxy = "sip:172.18.0.5:5060"
+    
+    # SIP 认证信息
+    register = true                       # 启用注册
+    username = "janus-sip"               # 用户名
+    secret = "janusSecret123"            # 密码
+    contact = "sip:janus-sip@172.18.0.4:5060"
+    
+    # RTP/RTCP 设置
+    rtp_port_range = "10000-10100"        # RTP 端口范围
+    
+    # 媒体设置
+    sip_keep_alive = 120                  # SIP keep-alive 间隔
+    max_calls = 100                       # 最大并发呼叫数
+    
+    # WebRTC 到 SIP 的编解码器设置
+    codecs = "opus,pcmu,pcma"            # 支持的编解码器
+    
+    # 音频转码设置
+    audio_level_extension = true          # 启用音频电平扩展
+    audio_inactive_detect = true          # 启用音频静音检测
+    
+    # DTMF 设置
+    dtmf_mode = "rfc2833"                # DTMF 模式
+    
+    # 媒体质量设置
+    symmetric_rtp = true                  # 启用对称 RTP
+    rtcp_mux = true                      # 启用 RTCP 复用
+    sdes_local = "private"               # SDES 本地策略
+    
+    # 调试设置
+    debug_level = 4                       # 调试级别 (1-7)
+    debug_timestamps = true               # 调试时间戳
+    debug_colors = true                   # 调试颜色
+} 

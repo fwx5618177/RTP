@@ -1,0 +1,108 @@
+@host = localhost:9501
+
+### 1. 基本房间操作测试 ###
+
+### Create room with audio only
+# @name createRoom
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user123",
+    "roomName": "test_room",
+    "config": {
+        "maxParticipants": 10,
+        "audioEnabled": true,
+        "videoEnabled": false,
+        "audioConfig": {
+            "sampleRate": 16000,
+            "channels": 1,
+            "codec": "opus"
+        }
+    }
+}
+
+### Get room details
+@roomId = {{createRoom.response.body.data.roomId}}
+GET http://{{host}}/api/rooms/{{roomId}}
+
+### Get room participants
+GET http://{{host}}/api/rooms/{{roomId}}/participants
+
+### Join room
+POST http://{{host}}/api/rooms/join
+Content-Type: application/json
+
+{
+    "roomId": "{{roomId}}",
+    "userId": "user789",
+    "display": "Test User"
+}
+
+### Leave room
+POST http://{{host}}/api/rooms/leave
+Content-Type: application/json
+
+{
+    "roomId": "{{roomId}}",
+    "userId": "user789"
+}
+
+### 2. 配置验证测试 ###
+
+### Create room with invalid configuration
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user123",
+    "roomName": "test_room",
+    "config": {
+        "maxParticipants": -1,
+        "audioEnabled": "invalid",
+        "audioConfig": {
+            "sampleRate": 12345,
+            "channels": 3
+        }
+    }
+}
+
+### Create room with invalid maxParticipants
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user123",
+    "roomName": "test_room",
+    "config": {
+        "maxParticipants": 1000,
+        "audioEnabled": true
+    }
+}
+
+### Create room with duplicate name
+POST http://{{host}}/api/rooms
+Content-Type: application/json
+
+{
+    "userId": "user456",
+    "roomName": "test_room",
+    "config": {
+        "maxParticipants": 10,
+        "audioEnabled": true
+    }
+}
+
+### 3. 音频配置测试 ###
+
+### Configure participant audio
+POST http://{{host}}/api/rooms/{{roomId}}/configure
+Content-Type: application/json
+
+{
+    "userId": "user789",
+    "audio": {
+        "muted": false,
+        "quality": 1.0
+    }
+}

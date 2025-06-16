@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace App\Config;
 
 use App\Controllers\HomeController;
+use App\Controllers\JanusController;
 use App\Controllers\RedisController;
+use App\Controllers\RoomController;
 use App\Controllers\UserController;
 use App\Controllers\WebSocketController;
+use App\Controllers\OptionsController;
+use App\Controllers\PbxController;
+use App\Middlewares\CorsMiddleware;
 use App\Middlewares\TestConditionMiddleware;
 use App\Middlewares\TestFlowMiddleware;
 use App\Routes\Router;
@@ -15,6 +20,7 @@ use App\Routes\Router;
 return function (Router $router) {
     // 添加全局中间件
     $router->addGlobalMiddleware(new TestFlowMiddleware());
+    $router->addGlobalMiddleware(new CorsMiddleware());
 
     // 基础路由
     $router->add('GET', '/', [HomeController::class, 'index'], [new TestConditionMiddleware()]);
@@ -54,5 +60,72 @@ return function (Router $router) {
         'middleware' => [new TestConditionMiddleware()],
     ], function ($route) {
         $route->add('GET', '/connect', [WebSocketController::class, 'connect']);
+    });
+
+    // 房间相关路由组
+    $router->group([
+        'prefix' => '/api/rooms',
+        'middleware' => [],
+    ], function ($route) {
+        // 房间基本操作
+        $route->add('POST', '/', [RoomController::class, 'createRoom']);
+        $route->add('GET', '/{roomId}', [RoomController::class, 'getRoomDetails']);
+        $route->add('POST', '/join', [RoomController::class, 'joinRoom']);
+        $route->add('POST', '/leave', [RoomController::class, 'leaveRoom']);
+
+        // 房间参与者
+        $route->add('GET', '/{roomId}/participants', [RoomController::class, 'getRoomParticipants']);
+
+        // SIP 相关
+        $route->add('POST', '/sip', [RoomController::class, 'joinRoom']);
+    });
+
+    // Janus WebRTC 相关路由组
+    $router->group([
+        'prefix' => '/api/janus',
+        'middleware' => [],
+    ], function ($route) {
+        // 会话管理
+        $route->add('POST', '/session', [JanusController::class, 'createSession']);
+        $route->add('DELETE', '/session/{sessionId}', [JanusController::class, 'destroySession']);
+
+        // SIP 桥接
+        $route->add('POST', '/sip/bridge/{sessionId}', [JanusController::class, 'createSipBridge']);
+        $route->add('PATCH', '/sip/bridge/{sessionId}', [JanusController::class, 'updateSipBridge']);
+        $route->add('DELETE', '/sip/bridge/{sessionId}', [JanusController::class, 'disconnectSipBridge']);
+
+        // 房间管理
+        $route->add('POST', '/room/join', [JanusController::class, 'joinRoom']);
+
+        // WebRTC 信令
+        $route->add('POST', '/{sessionId}/{handleId}/message', [JanusController::class, 'handleMessage']);
+        $route->add('POST', '/{sessionId}/{handleId}/trickle', [JanusController::class, 'handleTrickle']);
+
+        // OPTIONS 请求处理
+        $route->add('OPTIONS', '/{sessionId}/{handleId}', [OptionsController::class, 'handle']);
+        $route->add('OPTIONS', '/{sessionId}/{handleId}/trickle', [OptionsController::class, 'handle']);
+    });
+
+    // PBX 路由组
+    $router->group([
+        'prefix' => '/api/pbx',
+        'middleware' => [],
+    ], function ($route) {
+        $route->add('POST', '/call', [PbxController::class, 'makeCall']);
+        $route->add('GET', '/call/status/{extension}', [PbxController::class, 'getCallStatus']);
+        $route->add('GET', '/channels', [PbxController::class, 'getActiveChannels']);
+
+        // SIP 信令相关路由
+        $route->add('POST', '/sip/inbound', [PbxController::class, 'handleInboundCall']);
+        $route->add('POST', '/sip/response', [PbxController::class, 'handleSipResponse']);
+        $route->add('POST', '/sip/bye', [PbxController::class, 'handleSipBye']);
+
+        // SDP 协商相关路由
+        $route->add('POST', '/sdp/offer', [PbxController::class, 'handleSdpOffer']);
+        $route->add('POST', '/sdp/answer', [PbxController::class, 'handleSdpAnswer']);
+
+        // RTP 相关路由
+        $route->add('POST', '/rtp/start', [PbxController::class, 'startRtpForwarding']);
+        $route->add('POST', '/rtp/stop', [PbxController::class, 'stopRtpForwarding']);
     });
 };
