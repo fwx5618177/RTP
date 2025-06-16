@@ -4,114 +4,96 @@ namespace App\Server;
 
 use App\Config\Config;
 use App\Logs\Logger;
-use App\Services\WebSocketService;
-use Swoole\Http\Request;
-use Swoole\WebSocket\Frame;
+use App\Routes\WebSocketRouter;
 use Swoole\WebSocket\Server;
+use Swoole\Http\Request;
+use Swoole\Http\Response;
+use Swoole\WebSocket\Frame;
 
 class WebSocketServer
 {
     private Server $server;
+    private WebSocketRouter $router;
+    private Logger $logger;
+    private Config $config;
     private string $host;
     private int $port;
-    private Logger $logger;
-    private WebSocketService $wsService;
-    private array $connections = [];
 
     public function __construct()
     {
-        $config = Config::getInstance();
-        $this->host = $config->get('WS_HOST', '127.0.0.1');
-        $this->port = (int)$config->get('WS_PORT', 9502);
+        $this->config = Config::getInstance();
         $this->logger = Logger::getInstance('websocket-server');
-        $this->wsService = new WebSocketService();
+        $this->router = new WebSocketRouter();
+
+        $this->host = $this->config->get('WS_HOST', '0.0.0.0');
+        $this->port = (int)$this->config->get('WS_PORT', 9502);
+
+        // 加载WebSocket路由配置
+        $routeConfig = require __DIR__ . '/../Config/websocket.php';
+        $routeConfig($this->router);
 
         $this->server = new Server($this->host, $this->port);
+        $this->initializeServer();
+    }
 
-        // 设置 Swoole 服务器配置
+    private function initializeServer(): void
+    {
+        // 设置服务器配置
         $this->server->set([
-            'heartbeat_check_interval' => 60,
-            'heartbeat_idle_time' => 120,
             'worker_num' => 4,
             'max_request' => 1000,
-            'log_level' => SWOOLE_LOG_INFO,
+            'max_conn' => 10000,
+            'heartbeat_check_interval' => 60,
+            'heartbeat_idle_time' => 120,
         ]);
-
-        $this->registerEventHandlers();
+        $this->registerRoutes();
     }
 
-    private function registerEventHandlers(): void
+    private function registerRoutes(): void
     {
-        $this->server->on('open', [$this, 'onOpen']);
+        // 加载WebSocket路由配置
+        $routeConfig = require __DIR__ . '/../Config/websocket.php';
+        $routeConfig($this->router);
+
+        // 注册事件处理器
+        $this->server->on('start', [$this, 'onStart']);
+        $this->server->on('handshake', [$this, 'onHandshake']);
         $this->server->on('message', [$this, 'onMessage']);
         $this->server->on('close', [$this, 'onClose']);
-        $this->server->on('handshake', [$this, 'onHandshake']);
     }
 
-    public function onHandshake(Request $request, $response): bool
+    public function onStart(Server $server): void
+    {
+        $this->logger->info('WebSocket Server started', [
+            'host' => $server->host,
+            'port' => $server->port,
+            'master_pid' => $server->master_pid,
+            'manager_pid' => $server->manager_pid,
+            'worker_id' => $server->worker_id,
+            'worker_pid' => $server->worker_pid,
+        ]);
+
+        // 设置进程名称
+        if (function_exists('cli_set_process_title')) {
+            cli_set_process_title('php-ws-master');
+        }
+
+        // 输出启动信息到控制台
+        echo sprintf(
+            "\033[32m[%s] WebSocket Server started at ws://%s:%d\033[0m\n",
+            date('Y-m-d H:i:s'),
+            $server->host,
+            $server->port
+        );
+    }
+
+    public function onHandshake(Request $request, Response $response): bool
     {
         $this->logger->info('WebSocket handshake request', [
             'headers' => $request->header,
             'path' => $request->server['request_uri'],
         ]);
-
-        try {
-            // 验证握手信息
-            $handshakeData = [
-                'connection_id' => $request->header['x-connection-id'] ?? '',
-                'token' => $request->header['x-handshake-token'] ?? '',
-                'timestamp' => $request->header['x-handshake-timestamp'] ?? '',
-                'signature' => $request->header['x-handshake-signature'] ?? '',
-            ];
-
-            if (! $this->wsService->validateHandshake($handshakeData)) {
-                $this->logger->warning('Invalid handshake', $handshakeData);
-
-                return false;
-            }
-
-            // 设置 WebSocket 握手响应头
-            $response->status(101);
-            $response->header('Upgrade', 'websocket');
-            $response->header('Connection', 'Upgrade');
-            $response->header('Sec-WebSocket-Accept', base64_encode(sha1(
-                $request->header['sec-websocket-key'] . '258EAFA5-E914-47DA-95CA-C5AB0DC85B11',
-                true
-            )));
-
-            if (isset($request->header['sec-websocket-protocol'])) {
-                $response->header('Sec-WebSocket-Protocol', $request->header['sec-websocket-protocol']);
-            }
-
-            // 准备连接
-            if (! $this->prepareConnection($request)) {
-                $this->logger->error('Failed to prepare connection');
-
-                return false;
-            }
-
-            $this->logger->info('Handshake successful', [
-                'connection_id' => $handshakeData['connection_id'],
-                'fd' => $request->fd,
-            ]);
-
-            return true;
-        } catch (\Exception $e) {
-            $this->logger->error('Handshake error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return false;
-        }
-    }
-
-    public function onOpen(\Swoole\WebSocket\Server $server, Request $request): void
-    {
-        $this->logger->info('New WebSocket connection', [
-            'fd' => $request->fd,
-            'headers' => $request->header,
-        ]);
+        return $this->router->dispatch($this->server, '/handshake', $request, $response);
     }
 
     public function onMessage(Server $server, Frame $frame): void
@@ -120,43 +102,13 @@ class WebSocketServer
             'fd' => $frame->fd,
             'data' => $frame->data,
         ]);
-
-        try {
-            // 处理 ping 消息
-            if (strtolower($frame->data) === 'ping') {
-                $server->push($frame->fd, 'pong');
-
-                return;
-            }
-
-            // 处理 JSON 消息
-            $data = json_decode($frame->data, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                $response = [
-                    'type' => $data['type'] ?? 'unknown',
-                    'data' => $data['data'] ?? [],
-                ];
-                $server->push($frame->fd, json_encode($response));
-            } else {
-                // 如果不是 JSON，直接回显消息
-                $server->push($frame->fd, $frame->data);
-            }
-        } catch (\Exception $e) {
-            $this->logger->error('Error processing message', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            $server->push($frame->fd, json_encode([
-                'type' => 'error',
-                'message' => 'Internal server error',
-            ]));
-        }
+        $this->router->dispatch($server, '/message', $frame);
     }
 
     public function onClose(Server $server, int $fd): void
     {
         $this->logger->info('Connection closed', ['fd' => $fd]);
+        $this->router->dispatch($server, '/close', $fd);
     }
 
     public function start(): void
@@ -170,50 +122,8 @@ class WebSocketServer
         $this->server->stop();
     }
 
-    private function prepareConnection(Request $request): bool
+    public function getRouter(): WebSocketRouter
     {
-        try {
-            // 从 header 中获取 token
-            $token = $request->header['x-handshake-token'] ?? null;
-
-            if (! $token) {
-                $this->logger->warning('WebSocket connection attempt without token');
-
-                return false;
-            }
-
-            // 验证 token
-            if (! $this->wsService->validateToken($token)) {
-                $this->logger->warning('Invalid WebSocket token', ['token' => $token]);
-
-                return false;
-            }
-
-            // 存储连接信息
-            $connectionInfo = [
-                'token' => $token,
-                'connection_id' => $request->header['x-connection-id'] ?? null,
-                'ip' => $request->server['remote_addr'],
-                'user_agent' => $request->header['user-agent'] ?? 'unknown',
-                'connected_at' => time(),
-            ];
-
-            // 存储连接信息
-            $this->connections[$request->fd] = $connectionInfo;
-
-            $this->logger->info('WebSocket connection prepared', [
-                'fd' => $request->fd,
-                'connection_id' => $connectionInfo['connection_id'],
-            ]);
-
-            return true;
-        } catch (\Exception $e) {
-            $this->logger->error('Error preparing WebSocket connection', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return false;
-        }
+        return $this->router;
     }
 }
